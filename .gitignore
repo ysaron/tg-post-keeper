@@ -1,0 +1,7 @@
+logs
+temp_storage
+.idea
+__pycache__
+config.py
+postsorter_db.db
+PS_plan.txt
