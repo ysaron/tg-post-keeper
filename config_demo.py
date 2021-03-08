@@ -1,19 +1,11 @@
 from enum import Enum
 import logging
+from datetime import datetime
 from telebot import logger
 
 TOKEN = 'Paste your token here'
 
 DB_FILE = 'your_database_name.db'
-
-
-class Storages:
-    STATEFILE = 'temp_storage_filename_1.vdb'
-    RECORDS = 'temp_storage_filename_2.vdb'
-    CURRENT_RECORD = 'temp_storage_filename_3.vdb'
-    CAROUSEL = 'temp_storage_filename_4.vdb'
-    RECORD_LENGTH = 'temp_storage_filename_5.vdb'
-    CATEGORY = 'temp_storage_filename_6.vdb'
 
 
 class DefaultText:
@@ -137,3 +129,14 @@ class States(Enum):
     NEW_CATEGORY_NAME = '9'
     DELETE_POST = '10'
     REPLACE_POST = '11'
+
+
+def time_it(func):
+    """ Логирование времени выполнения любой функции """
+    def wrapper(*args, **kwargs):
+        start = datetime.now()
+        result = func(*args, **kwargs)
+        delta = (datetime.now() - start).microseconds
+        ps_logger.info(f'EXECUTION {func.__module__}.{func.__name__}: {delta/1000} ms')
+        return result
+    return wrapper

@@ -4,9 +4,9 @@ from telebot.types import Message, CallbackQuery
 from frame import User, Response, Post
 from sqler import SqlWorker
 import config
-import fsm
 
 
+@config.time_it
 def start_handler(message: Message) -> Response:
     """  """
     user = User(message)
@@ -16,6 +16,7 @@ def start_handler(message: Message) -> Response:
     if base.get_user(user.user_id) is None:
         config.ps_logger.info(f'NEW USER ({user.first_name} {user.last_name} | @{user.username})!')
         base.add_user(user)
+        base.write_user_in_state_table(user_id=user.user_id, state=config.States.DEFAULT.value)
 
     # Если у юзера нет нужных таблиц - создаем их
     if not base.check_table(f'{user.user_id}_temp'):
@@ -39,6 +40,7 @@ def start_handler(message: Message) -> Response:
     return Response(resp_type='start')
 
 
+@config.time_it
 def help_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -48,8 +50,8 @@ def help_handler(message: Message, data: dict) -> Response:
         # создаем и заполняем HELP заново?
         return Response(resp_type='no_posts')
     records_ids = [record['id'] for record in records]
-    fsm.write_records_id(user_id=user.user_id, id_list=records_ids)
-    fsm.write_current_record(user_id=user.user_id, post_id=records_ids[0])
+    base.write_records_id(user_id=user.user_id, id_list=records_ids)
+    base.write_current_record(user_id=user.user_id, post_id=records_ids[0])
     post_db = base.get_post(user.user_id, records_ids[0])
     post = Post(post_db)
     data['post'] = post
@@ -57,6 +59,7 @@ def help_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
+@config.time_it
 def add_category_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -74,6 +77,7 @@ def add_category_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='added_category', data=data)
 
 
+@config.time_it
 def record_handler(message: Message, data: dict) -> Response:
     """  """
     c_type = message.content_type
@@ -83,7 +87,7 @@ def record_handler(message: Message, data: dict) -> Response:
     # К слишком длинной подписи вложения не получится добавить стандартные подписи бота, не говоря уже о комментарии
     # Telegram разрешает caption не более 1024 символов
     if message.html_caption is not None and len(message.html_caption) > 880:
-        fsm.set_state(user.user_id, config.States.DEFAULT.value)
+        base.set_state(user.user_id, config.States.DEFAULT.value)
         return Response(resp_type='caption_too_long', data=data)
 
     # Поддерживаемые типы файлов:
@@ -140,6 +144,7 @@ def record_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='part_record', data=data)
 
 
+@config.time_it
 def assemble_post_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -192,8 +197,8 @@ def assemble_post_handler(message: Message, data: dict) -> Response:
     post_db = base.get_post(user_id=user_id)
     data['post'] = Post(post_db)
     data['user'] = user
-    fsm.write_current_record(user_id=user_id, post_id=data['post'].post_id)
-    fsm.write_carousel_id(user_id=user_id, carousel_ids=[message.message_id + 1])
+    base.write_current_record(user_id=user_id, post_id=data['post'].post_id)
+    base.write_carousel_id(user_id=user_id, carousel_ids=[message.message_id + 1])
     return Response(resp_type='assembled_post', data=data)
 
 
@@ -207,24 +212,26 @@ def cancel_assemble(message: Message):  # Мб возвращать Response? т
     """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    post_id = fsm.get_current_record(user.user_id)
+    post_id = base.get_user_state(user.user_id)['current_record']
     base.delete_post(user_id=user.user_id, post_id=post_id)
 
 
+@config.time_it
 def await_comment(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    post = Post(base.get_post(user_id=user.user_id, post_id=fsm.get_current_record(user.user_id)))
+    post = Post(base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record']))
     data['post'] = post
     return Response(resp_type='await_comment', data=data)
 
 
+@config.time_it
 def handle_comment(message: Message, data: dict) -> Response:
     """ Обрабатывает полученный коммент записи """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    post_db = base.get_post(user_id=user.user_id, post_id=fsm.get_current_record(user.user_id))
+    post_db = base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record'])
     post = Post(post_db)
     symbols = 3800 if post.attach_type == 'text' else 800
     if len(message.text) > symbols - len(post.text):
@@ -232,11 +239,13 @@ def handle_comment(message: Message, data: dict) -> Response:
         data['success'] = False
     else:
         added = base.edit_comment(user_id=user.user_id, post_id=post.post_id, comment=message.text)
-        data['post'] = Post(base.get_post(user_id=user.user_id, post_id=fsm.get_current_record(user.user_id)))
+        data['post'] = Post(base.get_post(user_id=user.user_id,
+                                          post_id=base.get_user_state(user.user_id)['current_record']))
         data['success'] = added
     return Response(resp_type='handled_comment', data=data)
 
 
+@config.time_it
 def choose_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -245,27 +254,32 @@ def choose_category(message: Message, data: dict) -> Response:
     return Response(resp_type='choose_category', data=data)
 
 
+@config.time_it
 def handle_category(call: CallbackQuery, data: dict) -> Response:
     """  """
     user = User(call.message)
     base = SqlWorker(config.DB_FILE)
-    data['success'] = base.edit_category(user_id=user.user_id, post_id=fsm.get_current_record(user.user_id),
+    data['success'] = base.edit_category(user_id=user.user_id,
+                                         post_id=base.get_user_state(user.user_id)['current_record'],
                                          category=call.data)
     if call.data not in base.get_user_categories(user.user_id):
         data['success'] = False
-    data['post'] = Post(base.get_post(user_id=user.user_id, post_id=fsm.get_current_record(user.user_id)))
+    data['post'] = Post(base.get_post(user_id=user.user_id,
+                                      post_id=base.get_user_state(user.user_id)['current_record']))
     return Response(resp_type='handled_category', data=data)
 
 
+@config.time_it
 def confirm_post(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    post_db = Post(base.get_post(user_id=user.user_id, post_id=fsm.get_current_record(user.user_id)))
+    post_db = Post(base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record']))
     data['category'] = post_db.category
     return Response(resp_type='confirm_post', data=data)
 
 
+@config.time_it
 def look_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -275,6 +289,7 @@ def look_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='look_categories', data=data)
 
 
+@config.time_it
 def look_records_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -283,8 +298,8 @@ def look_records_handler(message: Message, data: dict) -> Response:
     if not records:
         return Response(resp_type='no_posts', data=data)
     records_ids = [record['id'] for record in records]
-    fsm.write_records_id(user_id=user.user_id, id_list=records_ids)
-    fsm.write_current_record(user_id=user.user_id, post_id=records_ids[0])
+    base.write_records_id(user_id=user.user_id, id_list=records_ids)
+    base.write_current_record(user_id=user.user_id, post_id=records_ids[0])
     post_db = base.get_post(user.user_id, records_ids[0])
     post = Post(post_db)
     data['post'] = post
@@ -292,17 +307,19 @@ def look_records_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
+@config.time_it
 def delete_category_warn(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    data['state'] = fsm.get_current_state(user.user_id)
-    fsm.write_current_category(user.user_id, data['category'])
+    data['state'] = base.get_user_state(user.user_id)['state']
+    base.write_current_category(user.user_id, data['category'])
     records = base.get_all_by_category(user_id=user.user_id, category=data['category'])
     data['length'] = len(records)
     return Response(resp_type='delete_warning', data=data)
 
 
+@config.time_it
 def delete_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -316,14 +333,17 @@ def delete_category(message: Message, data: dict) -> Response:
     return Response(resp_type='deleted_category', data=data)
 
 
+@config.time_it
 def choose_new_category_name(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
-    data['state'] = fsm.get_current_state(user.user_id)
-    fsm.write_current_category(user.user_id, data['category'])
+    base = SqlWorker(config.DB_FILE)
+    data['state'] = base.get_user_state(user.user_id)['state']
+    base.write_current_category(user.user_id, data['category'])
     return Response(resp_type='new_category_name', data=data)
 
 
+@config.time_it
 def rename_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -342,16 +362,18 @@ def rename_category(message: Message, data: dict) -> Response:
     return Response(resp_type='renamed_category', data=data)
 
 
+@config.time_it
 def carousel_handler(call: CallbackQuery, data: dict) -> Response:
     """  """
     user = User(call.message)
     base = SqlWorker(config.DB_FILE)
-    records_ids = fsm.get_records_id(user.user_id)
-    if not records_ids:
+    try:
+        records_ids = [int(i) for i in base.get_user_state(user.user_id)['records_id'].split(',')]
+    except ValueError:
         return Response(resp_type='no_posts', data=data)
-    current_record = fsm.get_current_record(user.user_id)
+    current_record = base.get_user_state(user.user_id)['current_record']
     new_record = shift(records_ids, current_record, call.data)
-    fsm.write_current_record(user_id=user.user_id, post_id=new_record)
+    base.write_current_record(user_id=user.user_id, post_id=new_record)
     post_db = base.get_post(user.user_id, new_record)
     post = Post(post_db)
     data['post'] = post
@@ -359,10 +381,12 @@ def carousel_handler(call: CallbackQuery, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
+@config.time_it
 def delete_post_warn(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
-    data['state'] = fsm.get_current_state(user.user_id)
+    base = SqlWorker(config.DB_FILE)
+    data['state'] = base.get_user_state(user.user_id)['state']
     return Response(resp_type='delete_post_warning', data=data)
 
 
@@ -371,39 +395,41 @@ def change_post_cancel(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
+@config.time_it
 def delete_post(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    post_id = fsm.get_current_record(user.user_id)
+    post_id = base.get_user_state(user.user_id)['current_record']
     deleted: bool = base.delete_post(user_id=user.user_id, post_id=post_id)
-    post_list = fsm.get_records_id(user.user_id)
+    post_list = [int(i) for i in base.get_user_state(user.user_id)['records_id'].split(',')]
     new_record = shift(post_list, post_id, 'next')
     post_list.remove(post_id)
-    fsm.write_records_id(user_id=user.user_id, id_list=post_list)
-    fsm.write_current_record(user_id=user.user_id, post_id=new_record)
+    base.write_records_id(user_id=user.user_id, id_list=post_list)
+    base.write_current_record(user_id=user.user_id, post_id=new_record)
     post_db = base.get_post(user.user_id, new_record)
-    if post_db == {}:
+    if post_db is None:
         return Response(resp_type='no_posts', data=data)
     post = Post(post_db)
     data['post'] = post
     return Response(resp_type='carousel', data=data)
 
 
+@config.time_it
 def replace_post(message: Message, data: dict) -> Response:
     """  """
     # нужно просто изменить категорию поста в базе, затем собрать его заново и отправить как обычно
     user = User(message)
     base = SqlWorker(config.DB_FILE)
-    post_id = fsm.get_current_record(user.user_id)
+    post_id = base.get_user_state(user.user_id)['current_record']
     replaced: bool = base.edit_category(user_id=user.user_id, post_id=post_id, category=data['category'])
-    post_list = fsm.get_records_id(user.user_id)
+    post_list = [int(i) for i in base.get_user_state(user.user_id)['records_id'].split(',')]
     new_record = shift(post_list, post_id, 'next')
     post_list.remove(post_id)   # Удаление поста из текущей "карусели"
-    fsm.write_records_id(user_id=user.user_id, id_list=post_list)
-    fsm.write_current_record(user_id=user.user_id, post_id=new_record)
+    base.write_records_id(user_id=user.user_id, id_list=post_list)
+    base.write_current_record(user_id=user.user_id, post_id=new_record)
     post_db = base.get_post(user.user_id, new_record)
-    if post_db == {}:
+    if post_db is None:
         return Response(resp_type='no_posts', data=data)
     post = Post(post_db)
     data['post'] = post
