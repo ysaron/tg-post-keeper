@@ -288,7 +288,6 @@ def settings(message: Message):
     base = SqW(config.DB_FILE)
 
 
-@time_it
 @bot.callback_query_handler(
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.LOOK.value
 )
@@ -437,6 +436,7 @@ def send_post(message: Message, response: Response, carousel=False):
         bot.send_message(chat_id=message.chat.id, text=response.text)
 
 
+@time_it
 def delete_posts(message: Message, ids: list):
     """ удаляет все посты с id из списка """
     for i in ids:

@@ -6,7 +6,6 @@ from sqler import SqlWorker
 import config
 
 
-@config.time_it
 def start_handler(message: Message) -> Response:
     """  """
     user = User(message)
@@ -40,7 +39,6 @@ def start_handler(message: Message) -> Response:
     return Response(resp_type='start')
 
 
-@config.time_it
 def help_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -59,7 +57,6 @@ def help_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
-@config.time_it
 def add_category_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -77,7 +74,6 @@ def add_category_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='added_category', data=data)
 
 
-@config.time_it
 def record_handler(message: Message, data: dict) -> Response:
     """  """
     c_type = message.content_type
@@ -144,7 +140,6 @@ def record_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='part_record', data=data)
 
 
-@config.time_it
 def assemble_post_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -216,7 +211,6 @@ def cancel_assemble(message: Message):  # Мб возвращать Response? т
     base.delete_post(user_id=user.user_id, post_id=post_id)
 
 
-@config.time_it
 def await_comment(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -226,7 +220,6 @@ def await_comment(message: Message, data: dict) -> Response:
     return Response(resp_type='await_comment', data=data)
 
 
-@config.time_it
 def handle_comment(message: Message, data: dict) -> Response:
     """ Обрабатывает полученный коммент записи """
     user = User(message)
@@ -245,7 +238,6 @@ def handle_comment(message: Message, data: dict) -> Response:
     return Response(resp_type='handled_comment', data=data)
 
 
-@config.time_it
 def choose_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -254,7 +246,6 @@ def choose_category(message: Message, data: dict) -> Response:
     return Response(resp_type='choose_category', data=data)
 
 
-@config.time_it
 def handle_category(call: CallbackQuery, data: dict) -> Response:
     """  """
     user = User(call.message)
@@ -269,7 +260,6 @@ def handle_category(call: CallbackQuery, data: dict) -> Response:
     return Response(resp_type='handled_category', data=data)
 
 
-@config.time_it
 def confirm_post(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -279,7 +269,6 @@ def confirm_post(message: Message, data: dict) -> Response:
     return Response(resp_type='confirm_post', data=data)
 
 
-@config.time_it
 def look_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -289,7 +278,6 @@ def look_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='look_categories', data=data)
 
 
-@config.time_it
 def look_records_handler(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -307,7 +295,6 @@ def look_records_handler(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
-@config.time_it
 def delete_category_warn(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -319,7 +306,6 @@ def delete_category_warn(message: Message, data: dict) -> Response:
     return Response(resp_type='delete_warning', data=data)
 
 
-@config.time_it
 def delete_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -333,7 +319,6 @@ def delete_category(message: Message, data: dict) -> Response:
     return Response(resp_type='deleted_category', data=data)
 
 
-@config.time_it
 def choose_new_category_name(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -343,7 +328,6 @@ def choose_new_category_name(message: Message, data: dict) -> Response:
     return Response(resp_type='new_category_name', data=data)
 
 
-@config.time_it
 def rename_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -362,7 +346,6 @@ def rename_category(message: Message, data: dict) -> Response:
     return Response(resp_type='renamed_category', data=data)
 
 
-@config.time_it
 def carousel_handler(call: CallbackQuery, data: dict) -> Response:
     """  """
     user = User(call.message)
@@ -381,7 +364,6 @@ def carousel_handler(call: CallbackQuery, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
-@config.time_it
 def delete_post_warn(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -395,7 +377,6 @@ def change_post_cancel(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
-@config.time_it
 def delete_post(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
@@ -415,7 +396,6 @@ def delete_post(message: Message, data: dict) -> Response:
     return Response(resp_type='carousel', data=data)
 
 
-@config.time_it
 def replace_post(message: Message, data: dict) -> Response:
     """  """
     # нужно просто изменить категорию поста в базе, затем собрать его заново и отправить как обычно

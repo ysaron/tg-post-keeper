@@ -1,5 +1,5 @@
 from telebot import types
-from config import DEFAULT_CATEGORIES, States, time_it
+from config import DEFAULT_CATEGORIES, States
 
 
 class User:
@@ -267,7 +267,6 @@ class Response:
         return markup
 
     @staticmethod
-    @time_it
     def mkkb_look_categories(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup(row_width=3)
@@ -285,7 +284,6 @@ class Response:
         return markup
 
     @staticmethod
-    @time_it
     def mkkb_carousel(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup()
