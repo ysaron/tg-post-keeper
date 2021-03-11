@@ -1,5 +1,5 @@
 import telebot
-from telebot.types import Message, CallbackQuery, ReplyKeyboardRemove
+from telebot.types import Message, CallbackQuery
 import random
 
 from sqler import SqlWorker as SqW
@@ -27,7 +27,6 @@ def cmd_start(message: Message):
     """ Переход/возврат в дефолтное состояние """
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
-    # fsm.set_state(user_id=message.chat.id, value=States.DEFAULT.value)
     response = core.start_handler(message=message)
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
@@ -37,12 +36,10 @@ def cmd_help(message: Message):
     """  """
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.LOOK.value)
-    # fsm.set_state(user_id=message.chat.id, value=States.LOOK.value)
     response = core.help_handler(message, data)
     send_post(message, response, carousel=True)
     carousel_ids = core.define_carousel_ids(message, response)
     base.write_carousel_id(user_id=message.chat.id, carousel_ids=carousel_ids)
-    # fsm.write_carousel_id(message.chat.id, carousel_ids)
     bot.send_message(chat_id=message.chat.id, text='Управление постом:', reply_markup=response.keyboard)
 
 
@@ -209,17 +206,21 @@ def setup_post(call: CallbackQuery):
     elif call.data == 'comment':
         base.set_state(user_id=call.from_user.id, state=States.COMMENT.value)
         response = core.await_comment(call.message, data)
+        bot.answer_callback_query(callback_query_id=call.id, text=response.text)
         bot.send_message(chat_id=call.from_user.id, text=response.text, reply_markup=response.keyboard)
     elif call.data == 'cancel':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         core.cancel_assemble(call.message)
+        bot.answer_callback_query(callback_query_id=call.id, text='ОТМЕНА')
         bot.send_message(chat_id=call.message.chat.id, text='Сборка поста <b>отменена</b>.')
     elif call.data == 'del_comment':
+        bot.answer_callback_query(callback_query_id=call.id,
+                                  text=f'Временно не работает. Вините во всем ленивого разработчика.')
         pass  # отправить None в поле comment, снова отправить весь этот повторяющийся блок (запихнуть уже в функцию)
     elif call.data == 'confirm':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         response = core.confirm_post(message=call.message, data=data)
-        bot.send_message(chat_id=call.message.chat.id, text=response.text)
+        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.message_handler(
@@ -242,7 +243,22 @@ def accept_category(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     base.set_state(user_id=call.message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_category(call, data)
+    bot.answer_callback_query(callback_query_id=call.id, text=f'Посту присвоена категория {call.data}')
     send_post(call.message, response)
+
+
+@bot.message_handler(
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value and
+    message.text == 'Мои записи'
+)
+def look_categories(message: Message):
+    """ Просмотр сохраненных записей; отправляем редактируемое сообщение с категориями-кнопками """
+    base = SqW(config.DB_FILE)
+    base.set_state(user_id=message.chat.id, state=States.LOOK.value)
+    data['mode'] = 'look'
+    response = core.look_handler(message, data)
+    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
+    base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
 
 
 @bot.message_handler(
@@ -250,7 +266,7 @@ def accept_category(call: CallbackQuery):
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
                                                                                           States.LOOK.value]
 )
-def look_categories(message: Message):
+def look_categories_oldvers(message: Message):
     """ Просмотр сохраненных записей; отправляем редактируемое сообщение с категориями-кнопками """
     base = SqW(config.DB_FILE)
     if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
@@ -261,6 +277,15 @@ def look_categories(message: Message):
     response = core.look_handler(message, data)
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
     base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
+
+
+@bot.message_handler(
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value and
+    message.text == 'Настройки'
+)
+def settings(message: Message):
+    """  """
+    base = SqW(config.DB_FILE)
 
 
 @time_it
@@ -284,11 +309,11 @@ def look_records(call: CallbackQuery):
     elif call.data == 'pass':  # Нажата холостая кнопка
         pass
     elif call.data == 'cancel':
-        # ВСПЛЫВАЮЩИЕ УВЕДОМЛЕНИЯ МММ
         bot.answer_callback_query(callback_query_id=call.id, text='Отменено')
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        response = core.start_handler(message=call.message)
         bot.send_message(chat_id=call.message.chat.id, text='Вы вернулись в главное меню.',
-                         reply_markup=ReplyKeyboardRemove())
+                         reply_markup=response.keyboard)
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
     elif call.data == 'remove':
         base.set_state(user_id=call.from_user.id, state=States.DELETE_POST.value)
@@ -324,6 +349,7 @@ def delete_post_from_category(call: CallbackQuery):
     if call.data == 'confirm':
         response = core.delete_post(call.message, data)
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        bot.answer_callback_query(callback_query_id=call.id, text='Пост удален')
         send_post(call.message, response, carousel=True)
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)
@@ -353,6 +379,7 @@ def replace_post(call: CallbackQuery):
         data['category'] = call.data
         response = core.replace_post(call.message, data)
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        bot.answer_callback_query(callback_query_id=call.id, text='Пост перемещен')
         send_post(call.message, response, carousel=True)
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)

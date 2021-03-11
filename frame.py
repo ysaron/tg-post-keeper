@@ -84,16 +84,18 @@ class Response:
 
         if resp_type == 'start':
             self.text = '<b>Вы находитесь в главном меню.</b>\n► /help — узнать, как работать с ботом.'
+            self.keyboard = self.mkkb_main_kb()
 
         elif resp_type == 'added_category':
             self.text = self.mktext_added_category(data)
+            self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'part_record':
             self.text = 'Получено ✅' if data['success'] else 'Кажется, уже пора нажимать /assemble'
-            self.keyboard = self.mkkb_new_record(data)
+            self.keyboard = self.mkkb_new_record()
         elif resp_type == 'no_temp':
             self.text = 'Чтобы сохранить что-то, нужно сначала это что-то мне отправить ☝️'
             self.flag = 'no_records'
-            self.keyboard = types.ReplyKeyboardRemove()
+            self.keyboard = self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'caption_too_long':
             self.text = '❌ Недопустимая длина подписи вложения.'
         elif resp_type == 'assembled_post':
@@ -127,7 +129,7 @@ class Response:
                 self.flag = 'error2'
         elif resp_type == 'confirm_post':
             self.text = f'✅ Пост сохранен в категории <code>{data["category"]}</code>'
-            self.keyboard = types.ReplyKeyboardRemove()
+            self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'look_categories':
             self.text = self.mktext_categories_action(data)
             self.keyboard = self.mkkb_look_categories(data)
@@ -147,7 +149,7 @@ class Response:
             self.keyboard = self.mkkb_confirm(data)
         elif resp_type == 'deleted_category':
             self.text = f'✅ Категория <code>{data["category"]}</code> удалена, как и все ее посты.'
-            self.keyboard = types.ReplyKeyboardRemove()
+            self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'new_category_name':
             self.text = f'Введите новое название для категории <code>{data["category"]}</code>'
             self.keyboard = self.mkkb_confirm(data)
@@ -156,10 +158,18 @@ class Response:
                 self.text = f'✅ Категория <code>{data["category"]}</code> была переименована.'
             else:
                 self.text = '❌ Не удалось переименовать категорию.'
-            self.keyboard = types.ReplyKeyboardRemove()
+            self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'delete_post_warning':
             self.text = 'Удалить эту запись?'
             self.keyboard = self.mkkb_confirm(data)
+
+    @staticmethod
+    def mkkb_main_kb():
+        """  """
+        kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        buttons = ['Мои записи', 'Настройки']
+        kb.row(*buttons)
+        return kb
 
     @staticmethod
     def mktext_added_category(data: dict) -> str:
@@ -170,11 +180,10 @@ class Response:
             return f'❌ Категория <code>{data["category"]}</code> не была добавлена.'
 
     @staticmethod
-    def mkkb_new_record(data: dict):
+    def mkkb_new_record():
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         buttons = ['/assemble', '/cancel']
-        for button in buttons:
-            kb.add(button)
+        kb.row(*buttons)
         return kb
 
     @staticmethod
@@ -243,6 +252,10 @@ class Response:
     def mkkb_choose_category(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup()
+        try:
+            data['category'].remove('HELP')
+        except ValueError:
+            pass
         buttons = [types.InlineKeyboardButton(text=cat, callback_data=cat) for cat in data['category']]
         for index, category in enumerate(buttons):
             try:
@@ -334,7 +347,7 @@ class Response:
     def mkkb_no_posts(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup()
-        btn1 = types.InlineKeyboardButton(text=f'Отмена', callback_data=f'cancel')
+        btn1 = types.InlineKeyboardButton(text=f'Закрыть', callback_data=f'cancel')
         markup.add(btn1)
         return markup
 
