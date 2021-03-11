@@ -269,31 +269,17 @@ class Response:
     @staticmethod
     @time_it
     def mkkb_look_categories(data: dict):
-        """ КРАЙНЕ ГОВНОКОДИСТО. Подумать, как исправить """
+        """  """
         markup = types.InlineKeyboardMarkup(row_width=3)
-        buttons = data['category']
         if data['mode'] == 'look':
             markup.add(types.InlineKeyboardButton(text='Добавить категорию', callback_data='add_category'))
-        for index, category in enumerate(buttons):
-            try:
-                if index % 3 == 0:
-                    markup.row(types.InlineKeyboardButton(text=f'{buttons[index][0]} ({buttons[index][1]})',
-                                                          callback_data=f'{buttons[index][0]}'),
-                               types.InlineKeyboardButton(text=f'{buttons[index+1][0]} ({buttons[index+1][1]})',
-                                                          callback_data=f'{buttons[index+1][0]}'),
-                               types.InlineKeyboardButton(text=f'{buttons[index+2][0]} ({buttons[index+2][1]})',
-                                                          callback_data=f'{buttons[index+2][0]}'))
-            except IndexError:
-                if index == len(buttons) - 2:
-                    markup.row(types.InlineKeyboardButton(text=f'{buttons[index][0]} ({buttons[index][1]})',
-                                                          callback_data=f'{buttons[index][0]}'),
-                               types.InlineKeyboardButton(text=f'{buttons[index+1][0]} ({buttons[index+1][1]})',
-                                                          callback_data=f'{buttons[index+1][0]}'))
-                    break
-                elif index == len(buttons) - 1:
-                    markup.add(types.InlineKeyboardButton(text=f'{buttons[index][0]} ({buttons[index][1]})',
-                                                          callback_data=f'{buttons[index][0]}'))
-                    break
+
+        buttons = [types.InlineKeyboardButton(text=f'{btn[0]} ({btn[1]})', callback_data=btn[0])
+                   for btn in data['category']]
+        button_rows = clustering(buttons, group_by=3)
+        for btn_row in button_rows:
+            markup.row(*btn_row)
+
         cancel_text = 'Назад' if data['mode'] == 'replace' else 'Закрыть'
         markup.add(types.InlineKeyboardButton(text=f'{cancel_text}', callback_data=f'cancel'))
         return markup
@@ -352,3 +338,10 @@ class Response:
         return markup
 
 
+def clustering(lst: list, group_by: int):
+    it = [iter(lst)] * group_by
+    cluster = list(zip(*it))
+    extra = len(lst) % group_by
+    if extra != 0:
+        cluster.append(tuple(lst[-extra:]))
+    return cluster
