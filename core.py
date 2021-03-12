@@ -322,6 +322,9 @@ def delete_category(message: Message, data: dict) -> Response:
     """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
+    if data['category'] == 'HELP':
+        data['success'] = False
+        return Response(resp_type='deleted_category', data=data)
     posts_deleted = base.delete_all_by_category(user_id=user.user_id, category=data['category'])
     categories = base.get_user_categories(user.user_id).split(',')
     categories.remove(data['category'])

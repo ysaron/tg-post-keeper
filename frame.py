@@ -150,7 +150,10 @@ class Response:
                         f'\n❗️<b><i>Это действие необратимо.</i></b>'
             self.keyboard = self.mkkb_confirm(data)
         elif resp_type == 'deleted_category':
-            self.text = f'✅ Категория <code>{data["category"]}</code> удалена, как и все ее посты.'
+            if data['success']:
+                self.text = f'✅ Категория <code>{data["category"]}</code> удалена, как и все ее посты.'
+            else:
+                self.text = '❌ Не удалось удалить категорию.'
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'new_category_name':
             self.text = f'Введите новое название для категории <code>{data["category"]}</code>'
@@ -259,13 +262,9 @@ class Response:
         except ValueError:
             pass
         buttons = [types.InlineKeyboardButton(text=cat, callback_data=cat) for cat in data['category']]
-        for index, category in enumerate(buttons):
-            try:
-                if index % 2 == 0:
-                    markup.row(buttons[index], buttons[index+1])
-            except IndexError:
-                markup.add(buttons[index])
-                break
+        button_rows = clustering(buttons, group_by=3)
+        for btn_row in button_rows:
+            markup.row(*btn_row)
         return markup
 
     @staticmethod
