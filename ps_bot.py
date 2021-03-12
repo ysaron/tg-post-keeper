@@ -1,5 +1,5 @@
 import telebot
-from telebot.types import Message, CallbackQuery
+from telebot.types import Message, CallbackQuery, ReplyKeyboardRemove
 import random
 
 from sqler import SqlWorker as SqW
@@ -41,6 +41,13 @@ def cmd_help(message: Message):
     carousel_ids = core.define_carousel_ids(message, response)
     base.write_carousel_id(user_id=message.chat.id, carousel_ids=carousel_ids)
     bot.send_message(chat_id=message.chat.id, text='Управление постом:', reply_markup=response.keyboard)
+
+
+@bot.message_handler(commands=['update'], func=lambda message: message.chat.id == config.ADMIN_ID)
+def cmd_update(message: Message):
+    """ Обработка команды от админа - обновление информации о боте """
+    response = core.update(message, data)
+    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.message_handler(
@@ -409,6 +416,7 @@ def new_record(message: Message):
 def any_msg(message: Message):
     """ Обработка всего, что не было обработано другими хэндлерами, как неизвестной команды """
     base = SqW(config.DB_FILE)
+    delete_posts(message=message, ids=base.get_user_state(message.chat.id)['carousel_id'].split(','))
     help_msg = 'Непонятное сообщение.\nВозвращаемся в главное меню...\nПутеводитель по командам: /help'
     bot.send_message(chat_id=message.chat.id, text=help_msg)
     base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
@@ -418,7 +426,7 @@ def any_msg(message: Message):
 def send_post(message: Message, response: Response, carousel=False):
     """ Оболочка для различных способов отправки сообщений ботом в зависимости от типа поста """
     base = SqW(config.DB_FILE)
-    kb = response.keyboard if not carousel else None
+    kb = response.keyboard if not carousel else ReplyKeyboardRemove()
     if response.flag == 'text':
         bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=kb)
     elif response.flag == 'photo':
@@ -452,7 +460,7 @@ def delete_posts(message: Message, ids: list):
         try:
             bot.delete_message(message.chat.id, message_id=i)
         except Exception as e:
-            raise e
+            config.ps_logger.exception(f'Cannot delete posts for user {message.chat.id} => {e}')
 
 
 if __name__ == '__main__':

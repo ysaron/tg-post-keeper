@@ -24,17 +24,7 @@ def start_handler(message: Message) -> Response:
         base.add_user_storage(user.user_id)
 
         # Автоматически заполняем категорию help-постами
-        for help_post in config.HELP_POSTS:
-            base.write_record(user_id=user.user_id,
-                              message_text=help_post['message_text'],
-                              caption=help_post['caption'],
-                              att_photo=help_post['att_photo'],
-                              att_video=help_post['att_video'],
-                              att_document=help_post['att_document'],
-                              attach_type=help_post['attach_type'],
-                              ffc_title=help_post['ffc_title'],
-                              ffc_username=help_post['ffc_username'],
-                              category=help_post['category'])
+        help_fill(user.user_id)
     base.clear_temp(user.user_id)
     return Response(resp_type='start')
 
@@ -45,7 +35,6 @@ def help_handler(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     records = base.get_all_by_category(user_id=user.user_id, category='HELP')
     if not records:
-        # создаем и заполняем HELP заново?
         return Response(resp_type='no_posts')
     records_ids = [record['id'] for record in records]
     base.write_records_id(user_id=user.user_id, id_list=records_ids)
@@ -55,6 +44,17 @@ def help_handler(message: Message, data: dict) -> Response:
     data['post'] = post
     data['position'] = f'Стр. {records_ids.index(records_ids[0]) + 1} из {len(records_ids)}'
     return Response(resp_type='carousel', data=data)
+
+
+def update(message: Message, data: dict):
+    """ Обновляет категорию HELP у пользователей в соответствии с обновлением бота """
+    base = SqlWorker(config.DB_FILE)
+    all_users = base.get_all_users()
+    users_ids = [i['user_id'] for i in all_users]
+    for user_id in users_ids:
+        base.delete_all_by_category(user_id, category='HELP')
+        help_fill(user_id)
+    return Response(resp_type='updated', data=data)
 
 
 def add_category_handler(message: Message, data: dict) -> Response:
@@ -465,3 +465,17 @@ def define_carousel_ids(message: Message, response: Response) -> list:
         return [message.message_id + 1, message.message_id + 1 + additional_msg_amount]
 
 
+def help_fill(user_id: str):
+    """  """
+    base = SqlWorker(config.DB_FILE)
+    for help_post in config.HELP_POSTS:
+        base.write_record(user_id=user_id,
+                          message_text=help_post['message_text'],
+                          caption=help_post['caption'],
+                          att_photo=help_post['att_photo'],
+                          att_video=help_post['att_video'],
+                          att_document=help_post['att_document'],
+                          attach_type=help_post['attach_type'],
+                          ffc_title=help_post['ffc_title'],
+                          ffc_username=help_post['ffc_username'],
+                          category=help_post['category'])

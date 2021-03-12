@@ -85,7 +85,9 @@ class Response:
         if resp_type == 'start':
             self.text = '<b>Вы находитесь в главном меню.</b>\n► /help — узнать, как работать с ботом.'
             self.keyboard = self.mkkb_main_kb()
-
+        elif resp_type == 'updated':
+            self.text = 'Категория HELP была массово обновлена. /help'
+            self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'added_category':
             self.text = self.mktext_added_category(data)
             self.keyboard = self.mkkb_main_kb()

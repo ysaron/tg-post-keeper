@@ -4,6 +4,7 @@ from datetime import datetime
 from telebot import logger
 
 TOKEN = 'Paste your token here'
+ADMIN_ID = 0    # Paste your user id here
 
 DB_FILE = 'your_database_name.db'
 

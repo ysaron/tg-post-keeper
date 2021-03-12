@@ -34,6 +34,15 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot get user (id {user_id}) => ({e})')
                 return None
 
+    def get_all_users(self) -> list:
+        with self.connection:
+            try:
+                self.cursor.execute("""SELECT id, user_id, username, first_name, last_name, categories FROM users""")
+                return self.cursor.fetchall()
+            except Exception as e:
+                ps_logger.exception(f'Cannot get all users => ({e})')
+                return []
+
     def add_user(self, user: User):
         """ Добавление нового пользователя в базу """
         with self.connection:
