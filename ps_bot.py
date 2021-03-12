@@ -213,10 +213,6 @@ def setup_post(call: CallbackQuery):
         core.cancel_assemble(call.message)
         bot.answer_callback_query(callback_query_id=call.id, text='ОТМЕНА')
         bot.send_message(chat_id=call.message.chat.id, text='Сборка поста <b>отменена</b>.')
-    elif call.data == 'del_comment':
-        bot.answer_callback_query(callback_query_id=call.id,
-                                  text=f'Временно не работает. Вините во всем ленивого разработчика.')
-        pass  # отправить None в поле comment, снова отправить весь этот повторяющийся блок (запихнуть уже в функцию)
     elif call.data == 'confirm':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         response = core.confirm_post(message=call.message, data=data)
@@ -233,6 +229,19 @@ def accept_comment(message: Message):
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_comment(message, data)
     send_post(message, response)
+
+
+@bot.callback_query_handler(
+    func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.COMMENT.value
+)
+def cancel_comment(call):
+    """ Удаление ранее добавленного комментария """
+    base = SqW(config.DB_FILE)
+    if call.data == 'del_comment':
+        bot.answer_callback_query(callback_query_id=call.id, text='Комментарий удален')
+        response = core.remove_comment(call.message, data)
+        base.set_state(user_id=call.from_user.id, state=States.ASSEMBLE.value)
+        send_post(call.message, response)
 
 
 @bot.callback_query_handler(

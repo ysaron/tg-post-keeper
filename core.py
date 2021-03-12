@@ -230,11 +230,23 @@ def handle_comment(message: Message, data: dict) -> Response:
     if len(message.text) > symbols - len(post.text):
         data['post'] = post
         data['success'] = False
-    else:
-        added = base.edit_comment(user_id=user.user_id, post_id=post.post_id, comment=message.text)
-        data['post'] = Post(base.get_post(user_id=user.user_id,
-                                          post_id=base.get_user_state(user.user_id)['current_record']))
-        data['success'] = added
+        return Response(resp_type='handled_comment', data=data)
+    added = base.edit_comment(user_id=user.user_id, post_id=post.post_id, comment=message.text)
+    data['post'] = Post(base.get_post(user_id=user.user_id,
+                                      post_id=base.get_user_state(user.user_id)['current_record']))
+    data['success'] = added
+    return Response(resp_type='handled_comment', data=data)
+
+
+def remove_comment(message: Message, data: dict):
+    user = User(message)
+    base = SqlWorker(config.DB_FILE)
+    post_db = base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record'])
+    post = Post(post_db)
+    removed = base.edit_comment(user_id=user.user_id, post_id=post.post_id, comment=None)
+    data['post'] = Post(base.get_post(user_id=user.user_id,
+                                      post_id=base.get_user_state(user.user_id)['current_record']))
+    data['success'] = removed
     return Response(resp_type='handled_comment', data=data)
 
 

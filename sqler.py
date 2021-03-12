@@ -217,7 +217,7 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to delete post {post_id} for user {user_id} => ({e})')
                 return False
 
-    def edit_comment(self, user_id: int, post_id: int, comment: str):
+    def edit_comment(self, user_id: int, post_id: int, comment):
         """ Обновление поля комментария к посту пользователя """
         with self.connection:
             try:
