@@ -6,7 +6,7 @@ from sqler import SqlWorker as SqW
 import core
 from frame import Response
 import config
-from config import States, time_it
+from config import States, Replies as Rp, time_it
 
 bot = telebot.TeleBot(token=config.TOKEN, parse_mode='HTML')
 
@@ -40,7 +40,7 @@ def cmd_help(message: Message):
     send_post(message, response, carousel=True)
     carousel_ids = core.define_carousel_ids(message, response)
     base.write_carousel_id(user_id=message.chat.id, carousel_ids=carousel_ids)
-    bot.send_message(chat_id=message.chat.id, text='Управление постом:', reply_markup=response.keyboard)
+    bot.send_message(chat_id=message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
 
 
 @bot.message_handler(commands=['update'], func=lambda message: message.chat.id == config.ADMIN_ID)
@@ -62,7 +62,7 @@ def new_category(message: Message):
         delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
         base.write_carousel_id(message.chat.id, [0])
     base.set_state(user_id=message.chat.id, state=States.CATEGORY_NAME.value)
-    bot.send_message(chat_id=message.chat.id, text='Введите имя для новой категории (не более <b>20</b> символов)')
+    bot.send_message(chat_id=message.chat.id, text=Rp.CATEGORY_NAME)
 
 
 @bot.message_handler(
@@ -104,7 +104,7 @@ def delete_category(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text='Удаление отменено.')
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_REMOVAL)
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
     elif call.data == 'confirm':
@@ -148,7 +148,7 @@ def new_category_name(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text='Переименование отменено.')
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_RENAME)
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
     else:
@@ -168,9 +168,9 @@ def new_category_name_cancel(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text='Переименование отменено.')
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_RENAME)
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
-        base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
+        base.write_current_category(call.from_user.id, category='')
 
 
 @bot.message_handler(
@@ -184,7 +184,7 @@ def rename_category(message: Message):
     response = core.rename_category(message, data)
     delete_posts(message=message, ids=base.get_user_state(message.chat.id)['carousel_id'].split(','))
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-    base.write_current_category(message.chat.id, category='')  # Забыть текущую категорию
+    base.write_current_category(message.chat.id, category='')
     base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
 
 
@@ -218,8 +218,8 @@ def setup_post(call: CallbackQuery):
     elif call.data == 'cancel':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         core.cancel_assemble(call.message)
-        bot.answer_callback_query(callback_query_id=call.id, text='ОТМЕНА')
-        bot.send_message(chat_id=call.message.chat.id, text='Сборка поста <b>отменена</b>.')
+        bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_ASSEMBLING)
     elif call.data == 'confirm':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         response = core.confirm_post(message=call.message, data=data)
@@ -245,7 +245,7 @@ def cancel_comment(call):
     """ Удаление ранее добавленного комментария """
     base = SqW(config.DB_FILE)
     if call.data == 'del_comment':
-        bot.answer_callback_query(callback_query_id=call.id, text='Комментарий удален')
+        bot.answer_callback_query(callback_query_id=call.id, text=Rp.COMMENT_REMOVED)
         response = core.remove_comment(call.message, data)
         base.set_state(user_id=call.from_user.id, state=States.ASSEMBLE.value)
         send_post(call.message, response)
@@ -259,7 +259,7 @@ def accept_category(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     base.set_state(user_id=call.message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_category(call, data)
-    bot.answer_callback_query(callback_query_id=call.id, text=f'Посту присвоена категория {call.data}')
+    bot.answer_callback_query(callback_query_id=call.id, text=f'{Rp.POST_ASSIGNED}{call.data}')
     send_post(call.message, response)
 
 
@@ -313,21 +313,21 @@ def look_records(call: CallbackQuery):
     if call.data == 'add_category':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
         base.set_state(user_id=call.message.chat.id, state=States.CATEGORY_NAME.value)
-        bot.send_message(chat_id=call.message.chat.id, text='Введите имя новой категории (не более <b>20</b> символов)')
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.CATEGORY_NAME)
     elif call.data == 'prev' or call.data == 'next':
         response = core.carousel_handler(call, data)
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
         send_post(call.message, response, carousel=True)
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text='Управление постом:', reply_markup=response.keyboard)
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
     elif call.data == 'pass':  # Нажата холостая кнопка
         pass
     elif call.data == 'cancel':
-        bot.answer_callback_query(callback_query_id=call.id, text='Отменено')
+        bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
         response = core.start_handler(message=call.message)
-        bot.send_message(chat_id=call.message.chat.id, text='Вы вернулись в главное меню.',
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.MAIN_MENU_RET,
                          reply_markup=response.keyboard)
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
     elif call.data == 'remove':
@@ -352,7 +352,7 @@ def look_records(call: CallbackQuery):
         send_post(call.message, response, carousel=True)
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text='Управление постом:', reply_markup=response.keyboard)
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
 
 
 @bot.callback_query_handler(
@@ -364,14 +364,14 @@ def delete_post_from_category(call: CallbackQuery):
     if call.data == 'confirm':
         response = core.delete_post(call.message, data)
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.answer_callback_query(callback_query_id=call.id, text='Пост удален')
+        bot.answer_callback_query(callback_query_id=call.id, text=Rp.POST_REMOVED)
         send_post(call.message, response, carousel=True)
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text='✅ Пост был <b>удален</b>', reply_markup=response.keyboard)
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_REMOVED, reply_markup=response.keyboard)
     elif call.data == 'cancel':
         response = core.change_post_cancel(call.message, data)
-        bot.edit_message_text(text='Управление постом:', chat_id=call.message.chat.id,
+        bot.edit_message_text(text=Rp.POST_CONTROL, chat_id=call.message.chat.id,
                               message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
         bot.edit_message_reply_markup(reply_markup=response.keyboard, chat_id=call.message.chat.id,
                                       message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
@@ -386,7 +386,7 @@ def replace_post(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         response = core.change_post_cancel(call.message, data)
-        bot.edit_message_text(text='Управление постом:', chat_id=call.message.chat.id,
+        bot.edit_message_text(text=Rp.POST_CONTROL, chat_id=call.message.chat.id,
                               message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
         bot.edit_message_reply_markup(reply_markup=response.keyboard, chat_id=call.message.chat.id,
                                       message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
@@ -394,11 +394,11 @@ def replace_post(call: CallbackQuery):
         data['category'] = call.data
         response = core.replace_post(call.message, data)
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.answer_callback_query(callback_query_id=call.id, text='Пост перемещен')
+        bot.answer_callback_query(callback_query_id=call.id, text=Rp.POST_REPLACED)
         send_post(call.message, response, carousel=True)
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text='Пост был перемещен', reply_markup=response.keyboard)
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_REPLACED, reply_markup=response.keyboard)
     base.set_state(user_id=call.from_user.id, state=States.LOOK.value)
 
 
@@ -417,8 +417,7 @@ def any_msg(message: Message):
     """ Обработка всего, что не было обработано другими хэндлерами, как неизвестной команды """
     base = SqW(config.DB_FILE)
     delete_posts(message=message, ids=base.get_user_state(message.chat.id)['carousel_id'].split(','))
-    help_msg = 'Непонятное сообщение.\nВозвращаемся в главное меню...\nПутеводитель по командам: /help'
-    bot.send_message(chat_id=message.chat.id, text=help_msg)
+    bot.send_message(chat_id=message.chat.id, text=Rp.UNKNOWN)
     base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
 
 
@@ -441,7 +440,7 @@ def send_post(message: Message, response: Response, carousel=False):
     elif response.flag == 'media_group':
         bot.send_media_group(chat_id=message.chat.id, media=response.attachment)
         if not carousel:
-            bot.send_message(chat_id=message.chat.id, text='Управление постом:', reply_markup=response.keyboard)
+            bot.send_message(chat_id=message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
     elif response.flag == 'no_records':
         base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
         bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=kb)
@@ -465,4 +464,4 @@ def delete_posts(message: Message, ids: list):
 
 if __name__ == '__main__':
     random.seed()
-    bot.polling()  # после отладки изменить на bot.infinity_polling()
+    bot.infinity_polling()

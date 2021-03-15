@@ -1,11 +1,11 @@
 from telebot import types
-from config import DEFAULT_CATEGORIES, States
+from config import DEFAULT_CATEGORIES, States, Replies as Rp
 
 
 class User:
 
     def __init__(self, message: types.Message):
-        self.user_id = str(message.chat.id)  # или message.from_user.id
+        self.user_id = str(message.chat.id)
         self.username = message.from_user.username
         self.first_name = message.from_user.first_name
         self.last_name = message.from_user.last_name
@@ -41,7 +41,7 @@ class Post:
         if attach_type != 'media_group':
             return None
 
-        # определение, в каком листе должна появиться подпись
+        # определение, в каком списке должна появиться подпись
         photo_caption, video_caption, doc_caption = None, None, None
         if photos != '':
             photo_caption = caption
@@ -83,23 +83,23 @@ class Response:
         self.flag = None
 
         if resp_type == 'start':
-            self.text = '<b>Вы находитесь в главном меню.</b>\n► /help — узнать, как работать с ботом.'
+            self.text = Rp.START
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'updated':
-            self.text = 'Категория HELP была массово обновлена. /help'
+            self.text = Rp.HELP_UPDATED
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'added_category':
             self.text = self.mktext_added_category(data)
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'part_record':
-            self.text = 'Получено ✅' if data['success'] else 'Кажется, уже пора нажимать /assemble'
+            self.text = Rp.PART_RECEIVED_YES if data['success'] else Rp.PART_RECEIVED_NO
             self.keyboard = self.mkkb_new_record()
         elif resp_type == 'no_temp':
-            self.text = 'Чтобы сохранить что-то, нужно сначала это что-то мне отправить ☝️'
+            self.text = Rp.NO_TEMP
             self.flag = 'no_records'
             self.keyboard = self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'caption_too_long':
-            self.text = '❌ Недопустимая длина подписи вложения.'
+            self.text = Rp.CAPTION_TOO_LONG
         elif resp_type == 'assembled_post':
             self.text = self.mktext_assembled_post(data['post'])
             self.attachment = data['post'].attachment
@@ -115,10 +115,10 @@ class Response:
                 self.attachment = data['post'].attachment
                 self.keyboard = self.mkkb_assemble_post(data)
             else:
-                self.text = 'Попробуй еще.'
+                self.text = Rp.COMMENT_RETRY
                 self.flag = 'error1'
         elif resp_type == 'choose_category':
-            self.text = 'Выберите категорию из доступных'
+            self.text = Rp.CHOOSE_CATEGORY
             self.keyboard = self.mkkb_choose_category(data)
         elif resp_type == 'handled_category':
             if data['success']:
@@ -127,10 +127,10 @@ class Response:
                 self.attachment = data['post'].attachment
                 self.keyboard = self.mkkb_assemble_post(data)
             else:
-                self.text = '❌ Не-не-не. Нужно нажать кнопку с категорией.'
+                self.text = Rp.HANDLE_CATEGORY_ERROR
                 self.flag = 'error2'
         elif resp_type == 'confirm_post':
-            self.text = f'✅ Пост сохранен в категории <code>{data["category"]}</code>'
+            self.text = Rp.CONFIRM_POST_.format(data['category'])
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'look_categories':
             self.text = self.mktext_categories_action(data)
@@ -146,26 +146,25 @@ class Response:
             self.attachment = None      # Скидывать пикчу перекати поле скажем
             self.flag = 'text'
         elif resp_type == 'delete_warning':
-            self.text = f'Удалить категорию <code>{data["category"]}</code> и все ее посты ({data["length"]})?' \
-                        f'\n❗️<b><i>Это действие необратимо.</i></b>'
+            self.text = Rp.DELETE_WARNING_.format(data['category'], data['length'])
             self.keyboard = self.mkkb_confirm(data)
         elif resp_type == 'deleted_category':
             if data['success']:
-                self.text = f'✅ Категория <code>{data["category"]}</code> удалена, как и все ее посты.'
+                self.text = Rp.DELETED_CATEGORY_.format(data['category'])
             else:
-                self.text = '❌ Не удалось удалить категорию.'
+                self.text = Rp.DEL_CATEGORY_FAIL
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'new_category_name':
-            self.text = f'Введите новое название для категории <code>{data["category"]}</code>'
+            self.text = Rp.NEW_CATEGORY_NAME_.format(data['category'])
             self.keyboard = self.mkkb_confirm(data)
         elif resp_type == 'renamed_category':
             if data['success']:
-                self.text = f'✅ Категория <code>{data["category"]}</code> была переименована.'
+                self.text = Rp.RENAMED_CATEGORY_.format(data['category'])
             else:
-                self.text = '❌ Не удалось переименовать категорию.'
+                self.text = Rp.REN_CATEGORY_FAIL
             self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'delete_post_warning':
-            self.text = 'Удалить эту запись?'
+            self.text = Rp.DEL_POST_WARNING
             self.keyboard = self.mkkb_confirm(data)
 
     @staticmethod
@@ -180,9 +179,9 @@ class Response:
     def mktext_added_category(data: dict) -> str:
         """  """
         if data['success']:
-            return f'✅ Успешно добавлена категория <code>{data["category"]}</code>'
+            return Rp.ADDED_CATEGORY_YES_.format(data['category'])
         else:
-            return f'❌ Категория <code>{data["category"]}</code> не была добавлена.'
+            return Rp.ADDED_CATEGORY_NO_.format(data['category'])
 
     @staticmethod
     def mkkb_new_record():
@@ -220,7 +219,6 @@ class Response:
     @staticmethod
     def mkkb_assemble_post(data: dict) -> types.InlineKeyboardMarkup:
         """  """
-        # assert flag in range(3)
         kb = types.InlineKeyboardMarkup()
         btn1 = types.InlineKeyboardButton(text='Выбрать категорию', callback_data='category')
         btn2 = types.InlineKeyboardButton(text='Комментировать', callback_data='comment')
@@ -303,13 +301,13 @@ class Response:
     def mktext_categories_action(data: dict):
         """  """
         if data['mode'] == 'delete':
-            return 'Выберите категорию для удаления:'
+            return Rp.CATEGORIES_ACTION_DEL
         elif data['mode'] == 'rename':
-            return 'Выберите категорию для переименования:'
+            return Rp.CATEGORIES_ACTION_REN
         elif data['mode'] == 'replace':
-            return 'Выберите категорию для перемещения:'
+            return Rp.CATEGORIES_ACTION_REPL
         else:
-            return 'Выберите категорию для просмотра:'
+            return Rp.CATEGORIES_ACTION_LOOK
 
     @staticmethod
     def mkkb_confirm(data: dict):
@@ -326,7 +324,7 @@ class Response:
     @staticmethod
     def mktext_no_posts(data: dict):
         """  """
-        return f'❎ В выбранной категории сейчас нет ни одного поста.'
+        return Rp.NO_POSTS
 
     @staticmethod
     def mkkb_no_posts(data: dict):

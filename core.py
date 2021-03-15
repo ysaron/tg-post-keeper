@@ -413,7 +413,6 @@ def delete_post(message: Message, data: dict) -> Response:
 
 def replace_post(message: Message, data: dict) -> Response:
     """  """
-    # нужно просто изменить категорию поста в базе, затем собрать его заново и отправить как обычно
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
