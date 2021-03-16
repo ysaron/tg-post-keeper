@@ -206,6 +206,15 @@ def assemble_post(message: Message):
 def setup_post(call: CallbackQuery):
     """ Обработка коллбэк-кнопок в режиме сборки поста """
     base = SqW(config.DB_FILE)
+    # пример того как в карусели удаляются старые сообщения
+    # elif call.data == 'prev' or call.data == 'next':
+    #     response = core.carousel_handler(call, data)
+    #     delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+    #     send_post(call.message, response, carousel=True)
+    #     carousel_ids = core.define_carousel_ids(call.message, response)
+    #     base.write_carousel_id(call.from_user.id, carousel_ids)
+    #     bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
+
     if call.data == 'category':
         base.set_state(user_id=call.from_user.id, state=States.CATEGORY.value)
         response = core.choose_category(message=call.message, data=data)
@@ -425,31 +434,28 @@ def any_msg(message: Message):
 def send_post(message: Message, response: Response, carousel=False):
     """ Оболочка для различных способов отправки сообщений ботом в зависимости от типа поста """
     base = SqW(config.DB_FILE)
-    kb = response.keyboard if not carousel else ReplyKeyboardRemove()
     if response.flag == 'text':
-        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=kb)
+        bot.send_message(chat_id=message.chat.id, text=response.text)
     elif response.flag == 'photo':
-        bot.send_photo(chat_id=message.chat.id, photo=response.attachment[0], caption=response.text,
-                       reply_markup=kb)
+        bot.send_photo(chat_id=message.chat.id, photo=response.attachment[0], caption=response.text)
     elif response.flag == 'video':
-        bot.send_video(chat_id=message.chat.id, data=response.attachment[0], caption=response.text,
-                       reply_markup=kb)
+        bot.send_video(chat_id=message.chat.id, data=response.attachment[0], caption=response.text)
     elif response.flag == 'document':
-        bot.send_document(chat_id=message.chat.id, data=response.attachment[0], caption=response.text,
-                          reply_markup=kb)
+        bot.send_document(chat_id=message.chat.id, data=response.attachment[0], caption=response.text)
     elif response.flag == 'media_group':
         bot.send_media_group(chat_id=message.chat.id, media=response.attachment)
-        if not carousel:
-            bot.send_message(chat_id=message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
     elif response.flag == 'no_records':
         base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
-        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=kb)
+        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=ReplyKeyboardRemove())
     elif response.flag == 'error1':
         base.set_state(user_id=message.chat.id, state=States.COMMENT.value)
         bot.send_message(chat_id=message.chat.id, text=response.text)
     elif response.flag == 'error2':
         base.set_state(user_id=message.chat.id, state=States.CATEGORY.value)
         bot.send_message(chat_id=message.chat.id, text=response.text)
+
+    if response.flag in ['text', 'photo', 'video', 'document', 'media_group'] and not carousel:
+        bot.send_message(chat_id=message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
 
 
 @time_it
