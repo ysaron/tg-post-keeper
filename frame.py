@@ -169,6 +169,9 @@ class Response:
         elif resp_type == 'delete_post_warning':
             self.text = Rp.DEL_POST_WARNING
             self.keyboard = self.mkkb_confirm(data)
+        elif resp_type == 'settings':
+            self.text = 'Добавить сеттингс-текст в конфиг'
+            self.keyboard = self.mkkb_settings()
 
     @staticmethod
     def mkkb_main_kb():
@@ -282,19 +285,19 @@ class Response:
             markup.row(*btn_row)
 
         cancel_text = 'Назад' if data['mode'] == 'replace' else 'Закрыть'
-        markup.add(types.InlineKeyboardButton(text=f'{cancel_text}', callback_data=f'cancel'))
+        markup.add(types.InlineKeyboardButton(text=f'{cancel_text}', callback_data='cancel'))
         return markup
 
     @staticmethod
     def mkkb_carousel(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup()
-        btn1 = types.InlineKeyboardButton(text=f'<', callback_data=f'prev')
-        btn2 = types.InlineKeyboardButton(text=f'>', callback_data=f'next')
-        btn3 = types.InlineKeyboardButton(text=f'Закрыть', callback_data=f'cancel')
-        btn4 = types.InlineKeyboardButton(text=f'Удалить', callback_data=f'remove')
-        btn5 = types.InlineKeyboardButton(text=f'Переместить', callback_data=f'replace')
-        btn6 = types.InlineKeyboardButton(text=f'{data["position"]}', callback_data=f'pass')
+        btn1 = types.InlineKeyboardButton(text='<', callback_data='prev')
+        btn2 = types.InlineKeyboardButton(text='>', callback_data='next')
+        btn3 = types.InlineKeyboardButton(text='Закрыть', callback_data='cancel')
+        btn4 = types.InlineKeyboardButton(text='Удалить', callback_data='remove')
+        btn5 = types.InlineKeyboardButton(text='Переместить', callback_data='replace')
+        btn6 = types.InlineKeyboardButton(text=f'{data["position"]}', callback_data='pass')
         markup.row(btn1, btn6, btn2)
         markup.row(btn4, btn5)
         markup.add(btn3)
@@ -316,9 +319,9 @@ class Response:
     def mkkb_confirm(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup()
-        btn2 = types.InlineKeyboardButton(text=f'Отмена', callback_data=f'cancel')
+        btn2 = types.InlineKeyboardButton(text='Отмена', callback_data='cancel')
         if data['state'] in [States.DELETE.value, States.DELETE_POST.value]:
-            btn1 = types.InlineKeyboardButton(text=f'Подтвердить', callback_data=f'confirm')
+            btn1 = types.InlineKeyboardButton(text='Подтвердить', callback_data='confirm')
             markup.row(btn1, btn2)
         elif data['state'] in [States.RENAME.value, States.REPLACE_POST.value]:
             markup.add(btn2)
@@ -333,8 +336,20 @@ class Response:
     def mkkb_no_posts(data: dict):
         """  """
         markup = types.InlineKeyboardMarkup()
-        btn1 = types.InlineKeyboardButton(text=f'Закрыть', callback_data=f'cancel')
+        btn1 = types.InlineKeyboardButton(text='Закрыть', callback_data='cancel')
         markup.add(btn1)
+        return markup
+
+    @staticmethod
+    def mkkb_settings():
+        markup = types.InlineKeyboardMarkup()
+        btn1 = types.InlineKeyboardButton(text='Добавить категорию', callback_data='add_category')
+        btn2 = types.InlineKeyboardButton(text='Переименовать категорию', callback_data='ren_category')
+        btn3 = types.InlineKeyboardButton(text='Удалить категорию', callback_data='del_category')
+        btn4 = types.InlineKeyboardButton(text='Закрыть', callback_data='cancel')
+        buttons = [btn1, btn2, btn3, btn4]
+        for btn in buttons:
+            markup.add(btn)
         return markup
 
 

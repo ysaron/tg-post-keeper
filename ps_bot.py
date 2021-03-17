@@ -66,6 +66,50 @@ def new_category(message: Message):
 
 
 @bot.message_handler(
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value and
+    message.text == 'Настройки'
+)
+def settings(message: Message):
+    """  """
+    base = SqW(config.DB_FILE)
+    base.set_state(user_id=message.chat.id, state=States.SETTINGS.value)
+    response = core.settings_handler(message, data)
+    base.write_carousel_id(message.chat.id, [message.message_id + 1])
+    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
+
+
+@bot.callback_query_handler(
+    func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.SETTINGS.value
+)
+def selected_settings(call: CallbackQuery):
+    """  """
+    base = SqW(config.DB_FILE)
+    if call.data == 'add_category':
+        base.set_state(user_id=call.message.chat.id, state=States.CATEGORY_NAME.value)
+        bot.send_message(chat_id=call.message.chat.id, text=Rp.CATEGORY_NAME)
+        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+    elif call.data == 'ren_category':
+        base.set_state(user_id=call.message.chat.id, state=States.RENAME.value)
+        data['mode'] = 'rename'
+        response = core.look_handler(call.message, data)
+        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
+        base.write_carousel_id(user_id=call.message.chat.id, carousel_ids=[call.message.message_id + 1])
+    elif call.data == 'del_category':
+        base.set_state(user_id=call.message.chat.id, state=States.DELETE.value)
+        data['mode'] = 'delete'
+        response = core.look_handler(call.message, data)
+        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
+        base.write_carousel_id(user_id=call.message.chat.id, carousel_ids=[call.message.message_id + 1])
+    elif call.data == 'cancel':
+        base.set_state(user_id=call.message.chat.id, state=States.DEFAULT.value)
+        response = core.settings_cancel(call.message, data)
+        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
+
+
+@bot.message_handler(
     content_types=['text'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.CATEGORY_NAME.value)
 def add_category(message: Message):
@@ -316,15 +360,6 @@ def look_categories_oldvers(message: Message):
     base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
 
 
-@bot.message_handler(
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value and
-    message.text == 'Настройки'
-)
-def settings(message: Message):
-    """  """
-    base = SqW(config.DB_FILE)
-
-
 @bot.callback_query_handler(
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.LOOK.value
 )
@@ -447,13 +482,16 @@ def send_post(message: Message, response: Response, carousel=False):
     """ Оболочка для различных способов отправки сообщений ботом в зависимости от типа поста """
     base = SqW(config.DB_FILE)
     if response.flag == 'text':
-        bot.send_message(chat_id=message.chat.id, text=response.text)
+        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=ReplyKeyboardRemove())
     elif response.flag == 'photo':
-        bot.send_photo(chat_id=message.chat.id, photo=response.attachment[0], caption=response.text)
+        bot.send_photo(chat_id=message.chat.id, photo=response.attachment[0], caption=response.text,
+                       reply_markup=ReplyKeyboardRemove())
     elif response.flag == 'video':
-        bot.send_video(chat_id=message.chat.id, data=response.attachment[0], caption=response.text)
+        bot.send_video(chat_id=message.chat.id, data=response.attachment[0], caption=response.text,
+                       reply_markup=ReplyKeyboardRemove())
     elif response.flag == 'document':
-        bot.send_document(chat_id=message.chat.id, data=response.attachment[0], caption=response.text)
+        bot.send_document(chat_id=message.chat.id, data=response.attachment[0], caption=response.text,
+                          reply_markup=ReplyKeyboardRemove())
     elif response.flag == 'media_group':
         bot.send_media_group(chat_id=message.chat.id, media=response.attachment)
     elif response.flag == 'no_records':

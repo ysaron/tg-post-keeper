@@ -350,7 +350,7 @@ def rename_category(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     new = message.text
     old = data['category']
-    if old == 'HELP':
+    if old == 'HELP' or len(new) > 20:
         data['success'] = False
     else:
         changed1 = base.change_category_of_posts(user_id=user.user_id, old_category=old, new_category=new)
@@ -429,6 +429,18 @@ def replace_post(message: Message, data: dict) -> Response:
     post = Post(post_db)
     data['post'] = post
     return Response(resp_type='carousel', data=data)
+
+
+def settings_handler(message: Message, data: dict):
+    """  """
+    user = User(message)
+    base = SqlWorker(config.DB_FILE)
+    return Response(resp_type='settings', data=data)
+
+
+def settings_cancel(message: Message, data: dict):
+    """  """
+    return Response(resp_type='start')
 
 
 def extract_item(dicts: list[dict], key_: str):
