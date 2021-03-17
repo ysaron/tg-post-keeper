@@ -209,6 +209,7 @@ def cancel_assemble(message: Message):  # Мб возвращать Response? т
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
     base.delete_post(user_id=user.user_id, post_id=post_id)
+    return Response(resp_type='cancel_assembling')
 
 
 def await_comment(message: Message, data: dict) -> Response:

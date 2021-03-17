@@ -198,6 +198,8 @@ def assemble_post(message: Message):
     response = core.assemble_post_handler(message, data)
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
     send_post(message, response)
+    carousel_ids = core.define_carousel_ids(message, response)
+    base.write_carousel_id(message.chat.id, carousel_ids)
 
 
 @bot.callback_query_handler(
@@ -206,32 +208,31 @@ def assemble_post(message: Message):
 def setup_post(call: CallbackQuery):
     """ Обработка коллбэк-кнопок в режиме сборки поста """
     base = SqW(config.DB_FILE)
-    # пример того как в карусели удаляются старые сообщения
-    # elif call.data == 'prev' or call.data == 'next':
-    #     response = core.carousel_handler(call, data)
-    #     delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-    #     send_post(call.message, response, carousel=True)
-    #     carousel_ids = core.define_carousel_ids(call.message, response)
-    #     base.write_carousel_id(call.from_user.id, carousel_ids)
-    #     bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
-
     if call.data == 'category':
         base.set_state(user_id=call.from_user.id, state=States.CATEGORY.value)
         response = core.choose_category(message=call.message, data=data)
-        bot.send_message(chat_id=call.from_user.id, text=response.text, reply_markup=response.keyboard)
+        control_msg_id = base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+        bot.edit_message_text(text=response.text, chat_id=call.message.chat.id, message_id=control_msg_id)
+        bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=control_msg_id,
+                                      reply_markup=response.keyboard)
     elif call.data == 'comment':
         base.set_state(user_id=call.from_user.id, state=States.COMMENT.value)
         response = core.await_comment(call.message, data)
+        control_msg_id = base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+        bot.edit_message_text(text=response.text, chat_id=call.message.chat.id, message_id=control_msg_id)
+        bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=control_msg_id,
+                                      reply_markup=response.keyboard)
         bot.answer_callback_query(callback_query_id=call.id, text=response.text)
-        bot.send_message(chat_id=call.from_user.id, text=response.text, reply_markup=response.keyboard)
     elif call.data == 'cancel':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
-        core.cancel_assemble(call.message)
+        response = core.cancel_assemble(call.message)
         bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_ASSEMBLING)
+        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
+        delete_posts(message=call.message, ids=base.get_user_state(call.message.chat.id)['carousel_id'].split(','))
     elif call.data == 'confirm':
         base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         response = core.confirm_post(message=call.message, data=data)
+        delete_posts(message=call.message, ids=[base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]])
         bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
@@ -245,6 +246,11 @@ def accept_comment(message: Message):
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_comment(message, data)
     send_post(message, response)
+    msg_id_list = base.get_user_state(message.chat.id)['carousel_id'].split(',')
+    msg_id_list.append(str(int(msg_id_list[-1]) + 1))
+    delete_posts(message=message, ids=msg_id_list)
+    carousel_ids = core.define_carousel_ids(message, response)
+    base.write_carousel_id(message.chat.id, carousel_ids)
 
 
 @bot.callback_query_handler(
@@ -258,6 +264,9 @@ def cancel_comment(call):
         response = core.remove_comment(call.message, data)
         base.set_state(user_id=call.from_user.id, state=States.ASSEMBLE.value)
         send_post(call.message, response)
+        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        carousel_ids = core.define_carousel_ids(call.message, response)
+        base.write_carousel_id(call.from_user.id, carousel_ids)
 
 
 @bot.callback_query_handler(
@@ -270,6 +279,9 @@ def accept_category(call: CallbackQuery):
     response = core.handle_category(call, data)
     bot.answer_callback_query(callback_query_id=call.id, text=f'{Rp.POST_ASSIGNED}{call.data}')
     send_post(call.message, response)
+    delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+    carousel_ids = core.define_carousel_ids(call.message, response)
+    base.write_carousel_id(call.from_user.id, carousel_ids)
 
 
 @bot.message_handler(
@@ -461,11 +473,11 @@ def send_post(message: Message, response: Response, carousel=False):
 @time_it
 def delete_posts(message: Message, ids: list):
     """ удаляет все посты с id из списка """
-    for i in ids:
-        try:
+    try:
+        for i in ids:
             bot.delete_message(message.chat.id, message_id=i)
-        except Exception as e:
-            config.ps_logger.exception(f'Cannot delete posts for user {message.chat.id} => {e}')
+    except Exception as e:
+        config.ps_logger.exception(f'Cannot delete posts for user {message.chat.id} => {e}')
 
 
 if __name__ == '__main__':

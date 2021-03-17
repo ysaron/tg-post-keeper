@@ -129,6 +129,9 @@ class Response:
             else:
                 self.text = Rp.HANDLE_CATEGORY_ERROR
                 self.flag = 'error2'
+        elif resp_type == 'cancel_assembling':
+            self.text = Rp.CANCEL_ASSEMBLING
+            self.keyboard = self.mkkb_main_kb()
         elif resp_type == 'confirm_post':
             self.text = Rp.CONFIRM_POST_.format(data['category'])
             self.keyboard = self.mkkb_main_kb()
