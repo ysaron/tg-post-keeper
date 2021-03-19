@@ -43,19 +43,19 @@ class Post:
 
         # определение, в каком списке должна появиться подпись
         photo_caption, video_caption, doc_caption = None, None, None
-        if photos != '':
+        if photos:
             photo_caption = caption
-        elif photos == '' and videos != '':
+        elif not photos and videos:
             video_caption = caption
-        elif videos == '' and documents != '':
+        elif not videos and documents:
             doc_caption = caption
 
         photo_list = [types.InputMediaPhoto(photos.split(',')[0], caption=photo_caption, parse_mode='HTML')] + \
-                     [types.InputMediaPhoto(i) for i in photos.split(',')[1:]] if photos != '' else []
+                     [types.InputMediaPhoto(i) for i in photos.split(',')[1:]] if photos else []
         video_list = [types.InputMediaVideo(videos.split(',')[0], caption=video_caption, parse_mode='HTML')] + \
-                     [types.InputMediaVideo(i) for i in videos.split(',')[1:]] if videos != '' else []
+                     [types.InputMediaVideo(i) for i in videos.split(',')[1:]] if videos else []
         document_list = [types.InputMediaDocument(documents.split(',')[0], caption=doc_caption, parse_mode='HTML')] + \
-                        [types.InputMediaDocument(i) for i in documents.split(',')[1:]] if documents != '' else []
+                        [types.InputMediaDocument(i) for i in documents.split(',')[1:]] if documents else []
         return photo_list + video_list + document_list
 
     @staticmethod
@@ -345,6 +345,6 @@ def clustering(lst: list, group_by: int) -> list[tuple]:
     it = [iter(lst)] * group_by
     cluster = list(zip(*it))
     extra = len(lst) % group_by
-    if extra != 0:
+    if extra:
         cluster.append(tuple(lst[-extra:]))
     return cluster

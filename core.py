@@ -145,7 +145,7 @@ def assemble_post_handler(message: Message, data: dict) -> Response:
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     parts = base.get_all_temp(user.user_id)
-    if len(parts) == 0:
+    if not parts:
         return Response(resp_type='no_temp')
     elif len(parts) == 1:  # Запись из 1 части
         if parts[0]['content_type'] == 'text':  # текст без вложений
@@ -473,7 +473,7 @@ def define_carousel_ids(message: Message, response: Response) -> list:
         return [message.message_id + 1, message.message_id + 1 + additional_msg_amount]
 
 
-def help_fill(user_id: str):
+def help_fill(user_id: str) -> None:
     """ Добавляет пользователю заранее сконфигурированные HELP-посты """
     base = SqlWorker(config.DB_FILE)
     for help_post in config.HELP_POSTS:
