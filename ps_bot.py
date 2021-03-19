@@ -33,7 +33,7 @@ def cmd_start(message: Message):
 
 @bot.message_handler(commands=['help'])
 def cmd_help(message: Message):
-    """  """
+    """ Просмотр встроенной категории HELP """
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.LOOK.value)
     response = core.help_handler(message, data)
@@ -45,7 +45,7 @@ def cmd_help(message: Message):
 
 @bot.message_handler(commands=['update'], func=lambda message: message.chat.id == config.ADMIN_ID)
 def cmd_update(message: Message):
-    """ Обработка команды от админа - обновление информации о боте """
+    """ Обновление информации о боте в категории HELP (только для админа) """
     response = core.update(message, data)
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
@@ -56,7 +56,7 @@ def cmd_update(message: Message):
                                                                                           States.LOOK.value]
 )
 def new_category(message: Message):
-    """ Обработка команды /newcategory """
+    """ Добавление категории по команде """
     base = SqW(config.DB_FILE)
     if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
         delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
@@ -70,7 +70,7 @@ def new_category(message: Message):
     message.text == 'Настройки'
 )
 def settings(message: Message):
-    """  """
+    """ Открытие меню настроек """
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.SETTINGS.value)
     response = core.settings_handler(message, data)
@@ -82,7 +82,7 @@ def settings(message: Message):
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.SETTINGS.value
 )
 def selected_settings(call: CallbackQuery):
-    """  """
+    """ Обработка команды из меню Настройки """
     base = SqW(config.DB_FILE)
     if call.data == 'add_category':
         base.set_state(user_id=call.message.chat.id, state=States.CATEGORY_NAME.value)
@@ -113,7 +113,7 @@ def selected_settings(call: CallbackQuery):
     content_types=['text'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.CATEGORY_NAME.value)
 def add_category(message: Message):
-    """ Получен текст-название новой категории """
+    """ Обработка текста как названия новой категории """
     base = SqW(config.DB_FILE)
     new_state = States.DEFAULT.value
     base.set_state(user_id=message.chat.id, state=new_state)
@@ -128,7 +128,6 @@ def add_category(message: Message):
                                                                                           States.LOOK.value]
 )
 def choose_category_delete(message: Message):
-    """  """
     base = SqW(config.DB_FILE)
     if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
         delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
@@ -144,7 +143,6 @@ def choose_category_delete(message: Message):
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.DELETE.value
 )
 def delete_category(call: CallbackQuery):
-    """  """
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
@@ -172,7 +170,6 @@ def delete_category(call: CallbackQuery):
                                                                                           States.LOOK.value]
 )
 def choose_category_rename(message: Message):
-    """  """
     base = SqW(config.DB_FILE)
     if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
         delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
@@ -188,7 +185,6 @@ def choose_category_rename(message: Message):
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.RENAME.value
 )
 def new_category_name(call: CallbackQuery):
-    """  """
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
@@ -208,7 +204,6 @@ def new_category_name(call: CallbackQuery):
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.NEW_CATEGORY_NAME.value
 )
 def new_category_name_cancel(call: CallbackQuery):
-    """  """
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
@@ -222,7 +217,6 @@ def new_category_name_cancel(call: CallbackQuery):
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.NEW_CATEGORY_NAME.value
 )
 def rename_category(message: Message):
-    """  """
     base = SqW(config.DB_FILE)
     data['category'] = base.get_user_state(message.chat.id)['current_category']
     response = core.rename_category(message, data)
@@ -237,7 +231,7 @@ def rename_category(message: Message):
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value
 )
 def assemble_post(message: Message):
-    """ Обработка команды сборки ранее отправленного поста """
+    """ Сборка ранее отправленного поста (по команде) """
     base = SqW(config.DB_FILE)
     response = core.assemble_post_handler(message, data)
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
@@ -285,7 +279,7 @@ def setup_post(call: CallbackQuery):
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.COMMENT.value
 )
 def accept_comment(message: Message):
-    """ Обработка текста-комментария к собираемому посту """
+    """ Обработка текста как комментария к собираемому посту """
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_comment(message, data)
@@ -333,7 +327,7 @@ def accept_category(call: CallbackQuery):
     message.text == 'Мои записи'
 )
 def look_categories(message: Message):
-    """ Просмотр сохраненных записей; отправляем редактируемое сообщение с категориями-кнопками """
+    """ Просмотр добавленных категорий """
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.LOOK.value)
     data['mode'] = 'look'
@@ -348,7 +342,7 @@ def look_categories(message: Message):
                                                                                           States.LOOK.value]
 )
 def look_categories_oldvers(message: Message):
-    """ Просмотр сохраненных записей; отправляем редактируемое сообщение с категориями-кнопками """
+    """ Просмотр добавленных категорий по команде """
     base = SqW(config.DB_FILE)
     if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
         delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
@@ -377,7 +371,7 @@ def look_records(call: CallbackQuery):
         carousel_ids = core.define_carousel_ids(call.message, response)
         base.write_carousel_id(call.from_user.id, carousel_ids)
         bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
-    elif call.data == 'pass':  # Нажата холостая кнопка
+    elif call.data == 'pass':  # Нажата пустая кнопка
         pass
     elif call.data == 'cancel':
         bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
@@ -510,7 +504,7 @@ def send_post(message: Message, response: Response, carousel=False):
 
 @time_it
 def delete_posts(message: Message, ids: list):
-    """ удаляет все посты с id из списка """
+    """ Удаление всех постов с id из списка """
     try:
         for i in ids:
             bot.delete_message(message.chat.id, message_id=i)

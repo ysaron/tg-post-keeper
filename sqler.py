@@ -1,4 +1,5 @@
 import sqlite3
+from typing import Optional
 from frame import User
 from config import ps_logger, time_it
 
@@ -7,7 +8,7 @@ class SqlWorker:
     """ Класс для работы с SQLite """
 
     @staticmethod
-    def dict_factory(cursor, row):
+    def dict_factory(cursor, row) -> dict:
         """ Оформляет ответ БД в виде словаря """
         d = {}
         for index, column in enumerate(cursor.description):
@@ -20,10 +21,10 @@ class SqlWorker:
         self.cursor = self.connection.cursor()
 
         # Ускорение транзакций
-        self.cursor.execute("""PRAGMA synchronous = 0""")   # Риск повреждения базы при сбое питания
+        self.cursor.execute("""PRAGMA synchronous = 0""")   # (!) Риск повреждения базы при сбое питания
         self.cursor.execute("""PRAGMA temp_store = MEMORY""")
 
-    def get_user(self, user_id: str) -> dict or None:
+    def get_user(self, user_id: str) -> Optional[dict]:
         """ Получение данных о пользователе по id """
         with self.connection:
             try:
@@ -43,7 +44,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot get all users => ({e})')
                 return []
 
-    def add_user(self, user: User):
+    def add_user(self, user: User) -> bool:
         """ Добавление нового пользователя в базу """
         with self.connection:
             try:
@@ -71,7 +72,7 @@ class SqlWorker:
                 return False
 
     @time_it
-    def add_user_temp(self, user_id: str):
+    def add_user_temp(self, user_id: str) -> bool:
         """ Создание персональной таблицы пользователя для хранения необработанного поста  """
         with self.connection:
             try:
@@ -96,7 +97,7 @@ class SqlWorker:
                 return False
 
     @time_it
-    def add_user_storage(self, user_id: str):
+    def add_user_storage(self, user_id: str) -> bool:
         """ Создание персональной таблицы пользователя для хранения его постов """
         with self.connection:
             try:
@@ -144,8 +145,9 @@ class SqlWorker:
                 return False
 
     def add_temp_record(self, user_id: str, message_id: int, date: int, content_type, fw_date: int = None,
-                        ffc_id: str = None, ffc_title: str = None, ffc_username: str = None, message_text: str = None,
-                        caption: str = None, file_id: str = None, file_uniq_id: str = None, media_group_id: str = None):
+                        ffc_id: str = None, ffc_title: str = None, ffc_username: str = None,
+                        message_text: str = None, caption: str = None, file_id: str = None, file_uniq_id: str = None,
+                        media_group_id: str = None) -> bool:
         """ Запись в temp-таблицу пользователя поста или частей поста с медиагруппой """
         data = (message_id, date, content_type, fw_date, ffc_id, ffc_title, ffc_username, message_text, caption,
                 file_id, file_uniq_id, media_group_id)
@@ -171,7 +173,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot get all temporary records for user {user_id} => ({e})')
                 return []
 
-    def clear_temp(self, user_id: str):
+    def clear_temp(self, user_id: str) -> bool:
         """ Очистка temp-таблицы """
         with self.connection:
             try:
@@ -186,7 +188,7 @@ class SqlWorker:
     def write_record(self, user_id: str, message_text: str = None, caption: str = None, att_photo: str = None,
                      att_video: str = None, att_document: str = None, attach_type: str = None, ffc_id: str = None,
                      ffc_title: str = None, ffc_username: str = None, date: str = None, date_saved: str = None,
-                     comment: str = None, category: str = None):
+                     comment: str = None, category: str = None) -> bool:
         """ Записывает пост в постоянное хранилище пользователя """
         data = (message_text, caption, att_photo, att_video, att_document, attach_type, ffc_id, ffc_title, ffc_username,
                 date, date_saved, comment, category)
@@ -202,7 +204,7 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to write post for user {user_id} => ({e})')
                 return False
 
-    def get_post(self, user_id: str, post_id: int = None):
+    def get_post(self, user_id: str, post_id: int = None) -> Optional[dict]:
         """ Получение сохраненного поста (по id или последний сохраненный) """
         with self.connection:
             try:
@@ -215,7 +217,7 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to get post {post_id} for user {user_id} => ({e})')
                 return None
 
-    def delete_post(self, user_id: int, post_id: int):
+    def delete_post(self, user_id: int, post_id: int) -> bool:
         """ Удаление поста пользователя по id """
         with self.connection:
             try:
@@ -226,7 +228,7 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to delete post {post_id} for user {user_id} => ({e})')
                 return False
 
-    def edit_comment(self, user_id: int, post_id: int, comment):
+    def edit_comment(self, user_id: int, post_id: int, comment) -> bool:
         """ Обновление поля комментария к посту пользователя """
         with self.connection:
             try:
@@ -237,7 +239,7 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to edit comment field (user {user_id}, post {post_id}) => ({e})')
                 return False
 
-    def edit_category(self, user_id: int, post_id: int, category: str):
+    def edit_category(self, user_id: int, post_id: int, category: str) -> bool:
         """ Обновление категории поста пользователя """
         with self.connection:
             try:
@@ -260,7 +262,6 @@ class SqlWorker:
                 return []
 
     def delete_all_by_category(self, user_id: str, category: str) -> bool:
-        """  """
         with self.connection:
             try:
                 self.cursor.execute(f"""DELETE FROM '{user_id}_storage' WHERE category = ?""", (category,))
@@ -270,8 +271,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot delete all posts of "{category}" category for user {user_id} => ({e})')
                 return False
 
-    def change_category_of_posts(self, user_id: str, old_category: str, new_category: str):
-        """  """
+    def change_category_of_posts(self, user_id: str, old_category: str, new_category: str) -> bool:
         with self.connection:
             try:
                 self.cursor.execute(f"""UPDATE '{user_id}_storage' SET category = ? WHERE category = ?""",
@@ -293,7 +293,6 @@ class SqlWorker:
                 return {}
 
     def write_user_in_state_table(self, user_id: str, state: str) -> bool:
-        """   """
         with self.connection:
             try:
                 self.cursor.execute("""INSERT INTO temp ('user_id', 'state') VALUES (?, ?)""", (user_id, state))
@@ -303,8 +302,7 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to write user {user_id} in temp table => ({e})')
                 return False
 
-    def set_state(self, user_id: str, state: str = '1'):
-        """  """
+    def set_state(self, user_id: str, state: str = '1') -> bool:
         with self.connection:
             try:
                 self.cursor.execute("""UPDATE temp SET state = ? WHERE user_id = ?""", (state, user_id))
@@ -314,8 +312,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot set state {state} for user {user_id} => ({e})')
                 return False
 
-    def write_records_id(self, user_id: str, id_list: list[int]):
-        """   """
+    def write_records_id(self, user_id: str, id_list: list[int]) -> bool:
         id_list_str = ','.join([str(i) for i in id_list])
         with self.connection:
             try:
@@ -326,8 +323,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot write records_ids for user {user_id} => ({e})')
                 return False
 
-    def write_current_record(self, user_id: str, post_id: int):
-        """   """
+    def write_current_record(self, user_id: str, post_id: int) -> bool:
         with self.connection:
             try:
                 self.cursor.execute("""UPDATE temp SET current_record = ? WHERE user_id = ?""", (str(post_id), user_id))
@@ -337,8 +333,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot write current record {post_id} for user {user_id} => ({e})')
                 return False
 
-    def write_carousel_id(self, user_id: str, carousel_ids: list[int]):
-        """   """
+    def write_carousel_id(self, user_id: str, carousel_ids: list[int]) -> bool:
         carousel_id_str = ','.join([str(i) for i in carousel_ids])
         with self.connection:
             try:
@@ -349,8 +344,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot write carousel ids for user {user_id} => ({e})')
                 return False
 
-    def write_post_length(self, user_id: str, length: int):
-        """   """
+    def write_post_length(self, user_id: str, length: int) -> bool:
         with self.connection:
             try:
                 self.cursor.execute("""UPDATE temp SET post_length = ? WHERE user_id = ?""", (str(length), user_id))
@@ -360,8 +354,7 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot write post length for user {user_id} => ({e})')
                 return False
 
-    def write_current_category(self, user_id: str, category: str):
-        """   """
+    def write_current_category(self, user_id: str, category: str) -> bool:
         with self.connection:
             try:
                 self.cursor.execute("""UPDATE temp SET current_category = ? WHERE user_id = ?""",

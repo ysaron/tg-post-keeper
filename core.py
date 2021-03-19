@@ -7,7 +7,7 @@ import config
 
 
 def start_handler(message: Message) -> Response:
-    """  """
+    """ Обработка возврата в дефолтное состояние """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
 
@@ -30,7 +30,7 @@ def start_handler(message: Message) -> Response:
 
 
 def help_handler(message: Message, data: dict) -> Response:
-    """  """
+    """ Обработка команды /help """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     records = base.get_all_by_category(user_id=user.user_id, category='HELP')
@@ -58,7 +58,7 @@ def update(message: Message, data: dict):
 
 
 def add_category_handler(message: Message, data: dict) -> Response:
-    """  """
+    """ Обработка добавления новой категории """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     existing_categories = base.get_user_categories(user.user_id)
@@ -75,7 +75,7 @@ def add_category_handler(message: Message, data: dict) -> Response:
 
 
 def record_handler(message: Message, data: dict) -> Response:
-    """  """
+    """ Обработка новых записей в базе """
     c_type = message.content_type
     user = User(message)
     base = SqlWorker(config.DB_FILE)
@@ -141,7 +141,7 @@ def record_handler(message: Message, data: dict) -> Response:
 
 
 def assemble_post_handler(message: Message, data: dict) -> Response:
-    """  """
+    """ Сборка поста из 1 или более частей в temp """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     parts = base.get_all_temp(user.user_id)
@@ -198,13 +198,16 @@ def assemble_post_handler(message: Message, data: dict) -> Response:
 
 
 def epoch_to_strftime(epoch: int) -> str:
-    """  """
+    """
+    :param epoch: UNIX-время (кол-во секунд с 01.01.1970 00:00)
+    :return: Форматированное время ДД.ММ.ГГГГ
+    """
     date = datetime.fromtimestamp(epoch, tz=pytz.timezone('Europe/Moscow'))
     return date.strftime('%d.%m.%Y %H:%M:%S')
 
 
-def cancel_assemble(message: Message):  # Мб возвращать Response? тогда и пустую клаву можно передавать
-    """  """
+def cancel_assemble(message: Message):
+    """ Отмена сборки поста; удаление его из базы """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
@@ -213,7 +216,6 @@ def cancel_assemble(message: Message):  # Мб возвращать Response? т
 
 
 def await_comment(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post = Post(base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record']))
@@ -222,7 +224,7 @@ def await_comment(message: Message, data: dict) -> Response:
 
 
 def handle_comment(message: Message, data: dict) -> Response:
-    """ Обрабатывает полученный коммент записи """
+    """ Обрабатывает полученный комментарий записи """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_db = base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record'])
@@ -252,7 +254,6 @@ def remove_comment(message: Message, data: dict):
 
 
 def choose_category(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     data['category']: list = base.get_user_categories(user.user_id).split(',')
@@ -260,7 +261,7 @@ def choose_category(message: Message, data: dict) -> Response:
 
 
 def handle_category(call: CallbackQuery, data: dict) -> Response:
-    """  """
+    """ Редактирование категории при сборке поста """
     user = User(call.message)
     base = SqlWorker(config.DB_FILE)
     data['success'] = base.edit_category(user_id=user.user_id,
@@ -274,7 +275,7 @@ def handle_category(call: CallbackQuery, data: dict) -> Response:
 
 
 def confirm_post(message: Message, data: dict) -> Response:
-    """  """
+    """ Обработка подтверждения поста """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_db = Post(base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record']))
@@ -283,7 +284,7 @@ def confirm_post(message: Message, data: dict) -> Response:
 
 
 def look_handler(message: Message, data: dict) -> Response:
-    """  """
+    """ Просмотр сохраненных категорий """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     categories: list = base.get_user_categories(user.user_id).split(',')
@@ -292,7 +293,7 @@ def look_handler(message: Message, data: dict) -> Response:
 
 
 def look_records_handler(message: Message, data: dict) -> Response:
-    """  """
+    """ Начало просмотра постов категории (с №1) """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     records = base.get_all_by_category(user_id=user.user_id, category=data['category'])
@@ -309,7 +310,6 @@ def look_records_handler(message: Message, data: dict) -> Response:
 
 
 def delete_category_warn(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     data['state'] = base.get_user_state(user.user_id)['state']
@@ -320,7 +320,6 @@ def delete_category_warn(message: Message, data: dict) -> Response:
 
 
 def delete_category(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     if data['category'] == 'HELP':
@@ -336,7 +335,6 @@ def delete_category(message: Message, data: dict) -> Response:
 
 
 def choose_new_category_name(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     data['state'] = base.get_user_state(user.user_id)['state']
@@ -345,7 +343,6 @@ def choose_new_category_name(message: Message, data: dict) -> Response:
 
 
 def rename_category(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     new = message.text
@@ -363,7 +360,7 @@ def rename_category(message: Message, data: dict) -> Response:
 
 
 def carousel_handler(call: CallbackQuery, data: dict) -> Response:
-    """  """
+    """ Обработка переключений страниц с постами текущей категории """
     user = User(call.message)
     base = SqlWorker(config.DB_FILE)
     try:
@@ -381,7 +378,6 @@ def carousel_handler(call: CallbackQuery, data: dict) -> Response:
 
 
 def delete_post_warn(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     data['state'] = base.get_user_state(user.user_id)['state']
@@ -389,12 +385,10 @@ def delete_post_warn(message: Message, data: dict) -> Response:
 
 
 def change_post_cancel(message: Message, data: dict) -> Response:
-    """  """
     return Response(resp_type='carousel', data=data)
 
 
 def delete_post(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
@@ -413,7 +407,6 @@ def delete_post(message: Message, data: dict) -> Response:
 
 
 def replace_post(message: Message, data: dict) -> Response:
-    """  """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
@@ -432,14 +425,14 @@ def replace_post(message: Message, data: dict) -> Response:
 
 
 def settings_handler(message: Message, data: dict):
-    """  """
+    """ Переход в меню Настройки """
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     return Response(resp_type='settings', data=data)
 
 
 def settings_cancel(message: Message, data: dict):
-    """  """
+    """ Закрытие меню Настройки """
     return Response(resp_type='start')
 
 
@@ -452,7 +445,7 @@ def extract_item(dicts: list[dict], key_: str):
 
 
 def assemble_comment(message: Message, post: Post) -> str:
-    """  """
+    """ Прикрепление комментария к тексту поста """
     return '\n\n'.join([post.text, message.text])
 
 
@@ -471,7 +464,7 @@ def shift(items: list, current, direction: str):
 
 
 def define_carousel_ids(message: Message, response: Response) -> list:
-    """  """
+    """ Определяет список id сообщений, в дальнейшем подлежащих удалению """
     additional_msg_amount = 1
     if response.attachment is not None:
         return list(range(message.message_id + 1,
@@ -481,7 +474,7 @@ def define_carousel_ids(message: Message, response: Response) -> list:
 
 
 def help_fill(user_id: str):
-    """  """
+    """ Добавляет пользователю заранее сконфигурированные HELP-посты """
     base = SqlWorker(config.DB_FILE)
     for help_post in config.HELP_POSTS:
         base.write_record(user_id=user_id,

@@ -61,7 +61,7 @@ class Post:
     @staticmethod
     def create_attachment(photos: str, videos: str = None, documents: str = None, media: str = None,
                           attach_type: str = None):
-        """  """
+        """ Создание атрибута вложений """
         if attach_type == 'photo':
             return [photos]
         elif attach_type == 'video':
@@ -170,12 +170,11 @@ class Response:
             self.text = Rp.DEL_POST_WARNING
             self.keyboard = self.mkkb_confirm(data)
         elif resp_type == 'settings':
-            self.text = 'Добавить сеттингс-текст в конфиг'
+            self.text = Rp.SETTINGS
             self.keyboard = self.mkkb_settings()
 
     @staticmethod
-    def mkkb_main_kb():
-        """  """
+    def mkkb_main_kb() -> types.ReplyKeyboardMarkup:
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         buttons = ['Мои записи', 'Настройки']
         kb.row(*buttons)
@@ -183,14 +182,13 @@ class Response:
 
     @staticmethod
     def mktext_added_category(data: dict) -> str:
-        """  """
         if data['success']:
             return Rp.ADDED_CATEGORY_YES_.format(data['category'])
         else:
             return Rp.ADDED_CATEGORY_NO_.format(data['category'])
 
     @staticmethod
-    def mkkb_new_record():
+    def mkkb_new_record() -> types.ReplyKeyboardMarkup:
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         buttons = ['/assemble', '/cancel']
         kb.row(*buttons)
@@ -198,7 +196,6 @@ class Response:
 
     @staticmethod
     def mktext_assembled_post(post: Post) -> str:
-        """  """
         if post.category is not None:
             text = f'<u><b>Категория:</b> {post.category}</u>\n\n'
         else:
@@ -224,7 +221,6 @@ class Response:
 
     @staticmethod
     def mkkb_assemble_post(data: dict) -> types.InlineKeyboardMarkup:
-        """  """
         kb = types.InlineKeyboardMarkup()
         btn1 = types.InlineKeyboardButton(text='Выбрать категорию', callback_data='category')
         btn2 = types.InlineKeyboardButton(text='Комментировать', callback_data='comment')
@@ -237,8 +233,7 @@ class Response:
         return kb
 
     @staticmethod
-    def mktext_await_comment(data: dict):
-        """  """
+    def mktext_await_comment(data: dict) -> str:
         if data['post'].attach_type == 'text':
             symbols = 3900 - len(data['post'].text)
         else:
@@ -249,8 +244,7 @@ class Response:
         return text
 
     @staticmethod
-    def mkkb_await_comment(data: dict):
-        """  """
+    def mkkb_await_comment(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         if data['post'].comment is not None:
             btn1 = types.InlineKeyboardButton(text='Удалить комментарий', callback_data='del_comment')
@@ -258,8 +252,7 @@ class Response:
         return markup
 
     @staticmethod
-    def mkkb_choose_category(data: dict):
-        """  """
+    def mkkb_choose_category(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         try:
             data['category'].remove('HELP')
@@ -272,8 +265,7 @@ class Response:
         return markup
 
     @staticmethod
-    def mkkb_look_categories(data: dict):
-        """  """
+    def mkkb_look_categories(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup(row_width=3)
         if data['mode'] == 'look':
             markup.add(types.InlineKeyboardButton(text='Добавить категорию', callback_data='add_category'))
@@ -289,8 +281,7 @@ class Response:
         return markup
 
     @staticmethod
-    def mkkb_carousel(data: dict):
-        """  """
+    def mkkb_carousel(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         btn1 = types.InlineKeyboardButton(text='<', callback_data='prev')
         btn2 = types.InlineKeyboardButton(text='>', callback_data='next')
@@ -304,8 +295,7 @@ class Response:
         return markup
 
     @staticmethod
-    def mktext_categories_action(data: dict):
-        """  """
+    def mktext_categories_action(data: dict) -> str:
         if data['mode'] == 'delete':
             return Rp.CATEGORIES_ACTION_DEL
         elif data['mode'] == 'rename':
@@ -316,8 +306,7 @@ class Response:
             return Rp.CATEGORIES_ACTION_LOOK
 
     @staticmethod
-    def mkkb_confirm(data: dict):
-        """  """
+    def mkkb_confirm(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         btn2 = types.InlineKeyboardButton(text='Отмена', callback_data='cancel')
         if data['state'] in [States.DELETE.value, States.DELETE_POST.value]:
@@ -328,20 +317,18 @@ class Response:
         return markup
 
     @staticmethod
-    def mktext_no_posts(data: dict):
-        """  """
+    def mktext_no_posts(data: dict) -> str:
         return Rp.NO_POSTS
 
     @staticmethod
-    def mkkb_no_posts(data: dict):
-        """  """
+    def mkkb_no_posts(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         btn1 = types.InlineKeyboardButton(text='Закрыть', callback_data='cancel')
         markup.add(btn1)
         return markup
 
     @staticmethod
-    def mkkb_settings():
+    def mkkb_settings() -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         btn1 = types.InlineKeyboardButton(text='Добавить категорию', callback_data='add_category')
         btn2 = types.InlineKeyboardButton(text='Переименовать категорию', callback_data='ren_category')
@@ -353,7 +340,8 @@ class Response:
         return markup
 
 
-def clustering(lst: list, group_by: int):
+def clustering(lst: list, group_by: int) -> list[tuple]:
+    """ Группирует список в список кортежей """
     it = [iter(lst)] * group_by
     cluster = list(zip(*it))
     extra = len(lst) % group_by
