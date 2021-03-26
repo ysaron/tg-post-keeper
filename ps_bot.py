@@ -22,6 +22,47 @@ data = {
 }
 
 
+class MsqUpdate:
+    """ Контекстный менеджер для удаления старых сообщений по ID и записи ID новых сообщений """
+
+    def __init__(self, response: Response = None, message: Message = None, delete: bool = False, last: bool = False,
+                 mem: bool = False, next_one: bool = False, state: str = None):
+        """
+        :param response: объект подготовленного ответа бота
+        :param message: объект входящего сообщения
+        :param delete: True/False - удалить/не удалять запомненные ранее сообщения
+        :param last: True/False - удалить последнее/все запомненные сообщения
+        :param mem: True/False - запомнить/не запоминать отправляемые сообщения
+        :param next_one: True/False - запомнить 1 следующее сообщение/вычислить id запоминаемой группы сообщений
+        :param state: not None - сменить состояние диалога
+        """
+        self.base = SqW(config.DB_FILE)
+        self.message = message
+        self.response = response
+        self.delete = delete
+        self.last = last
+        self.mem = mem
+        self.next = next_one
+        self.state = state
+
+    def __enter__(self):
+        if self.delete:
+            id_list = self.base.get_user_state(self.message.chat.id)['carousel_id'].split(',')
+            if self.last:
+                id_list = [id_list[-1]]
+            delete_posts(message=self.message, ids=id_list)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.mem:
+            if self.next:
+                carousel_ids = [self.message.message_id + 1]
+            else:
+                carousel_ids = core.define_carousel_ids(message=self.message, response=self.response)
+            self.base.write_carousel_id(user_id=self.message.chat.id, carousel_ids=carousel_ids)
+        if self.state:
+            self.base.set_state(user_id=self.message.chat.id, state=self.state)
+
+
 @bot.message_handler(commands=['start', 'cancel'])
 def cmd_start(message: Message):
     """ Переход/возврат в дефолтное состояние """
@@ -37,10 +78,9 @@ def cmd_help(message: Message):
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.LOOK.value)
     response = core.help_handler(message, data)
-    send_post(message, response, carousel=True)
-    carousel_ids = core.define_carousel_ids(message, response)
-    base.write_carousel_id(user_id=message.chat.id, carousel_ids=carousel_ids)
-    bot.send_message(chat_id=message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
+    with MsqUpdate(response, message, mem=True):
+        send_post(message, response, carousel=True)
+        bot.send_message(chat_id=message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
 
 
 @bot.message_handler(commands=['update'], func=lambda message: message.chat.id == config.ADMIN_ID)
@@ -50,6 +90,7 @@ def cmd_update(message: Message):
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
+# убрать команду
 @bot.message_handler(
     commands=['newcategory'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
@@ -66,16 +107,14 @@ def new_category(message: Message):
 
 
 @bot.message_handler(
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value and
-    message.text == 'Настройки'
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value
+    and message.text == 'Настройки'
 )
 def settings(message: Message):
     """ Открытие меню настроек """
-    base = SqW(config.DB_FILE)
-    base.set_state(user_id=message.chat.id, state=States.SETTINGS.value)
     response = core.settings_handler(message, data)
-    base.write_carousel_id(message.chat.id, [message.message_id + 1])
-    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
+    with MsqUpdate(response, message, mem=True, next_one=True, state=States.SETTINGS.value):
+        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.callback_query_handler(
@@ -83,30 +122,23 @@ def settings(message: Message):
 )
 def selected_settings(call: CallbackQuery):
     """ Обработка команды из меню Настройки """
-    base = SqW(config.DB_FILE)
     if call.data == 'add_category':
-        base.set_state(user_id=call.message.chat.id, state=States.CATEGORY_NAME.value)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.CATEGORY_NAME)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
+        with MsqUpdate(message=call.message, delete=True, state=States.CATEGORY_NAME.value):
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.CATEGORY_NAME)
     elif call.data == 'ren_category':
-        base.set_state(user_id=call.message.chat.id, state=States.RENAME.value)
         data['mode'] = 'rename'
         response = core.look_handler(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-        base.write_carousel_id(user_id=call.message.chat.id, carousel_ids=[call.message.message_id + 1])
+        with MsqUpdate(response, call.message, delete=True, mem=True, next_one=True, state=States.RENAME.value):
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
     elif call.data == 'del_category':
-        base.set_state(user_id=call.message.chat.id, state=States.DELETE.value)
         data['mode'] = 'delete'
         response = core.look_handler(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-        base.write_carousel_id(user_id=call.message.chat.id, carousel_ids=[call.message.message_id + 1])
+        with MsqUpdate(response, call.message, delete=True, mem=True, next_one=True, state=States.DELETE.value):
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
     elif call.data == 'cancel':
-        base.set_state(user_id=call.message.chat.id, state=States.DEFAULT.value)
         response = core.settings_cancel(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
+        with MsqUpdate(response, call.message, delete=True, state=States.DEFAULT.value):
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.message_handler(
@@ -122,6 +154,7 @@ def add_category(message: Message):
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
+# убрать команду, она больше не нужна
 @bot.message_handler(
     commands=['delete'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
@@ -145,25 +178,23 @@ def choose_category_delete(message: Message):
 def delete_category(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_REMOVAL)
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
-        base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
+        with MsqUpdate(message=call.message, delete=True, state=States.DEFAULT.value):
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_REMOVAL)
+            base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
     elif call.data == 'confirm':
         data['category'] = base.get_user_state(call.from_user.id)['current_category']
-        base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
         response = core.delete_category(call.message, data=data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
+        with MsqUpdate(response, call.message, delete=True, state=States.DEFAULT.value):
+            base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
     else:
         data['category'] = call.data
         response = core.delete_category_warn(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-        base.write_carousel_id(user_id=call.message.chat.id, carousel_ids=[call.message.message_id + 1])
+        with MsqUpdate(response, call.message, delete=True, mem=True, next_one=True):
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
+# ubrat comandu
 @bot.message_handler(
     commands=['rename'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
@@ -187,43 +218,38 @@ def choose_category_rename(message: Message):
 def new_category_name(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_RENAME)
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
-        base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
+        with MsqUpdate(message=call.message, delete=True, state=States.DEFAULT.value):
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_RENAME)
+            base.write_current_category(call.from_user.id, category='')  # Забыть текущую категорию
     else:
         data['category'] = call.data
         response = core.choose_new_category_name(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-        base.write_carousel_id(user_id=call.message.chat.id, carousel_ids=[call.message.message_id + 1])
-        base.set_state(user_id=call.from_user.id, state=States.NEW_CATEGORY_NAME.value)
+        with MsqUpdate(response, call.message, delete=True, mem=True, next_one=True, state=States.NEW_CAT_NAME.value):
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.callback_query_handler(
-    func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.NEW_CATEGORY_NAME.value
+    func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.NEW_CAT_NAME.value
 )
 def new_category_name_cancel(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_RENAME)
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
-        base.write_current_category(call.from_user.id, category='')
+        with MsqUpdate(message=call.message, delete=True, state=States.DEFAULT.value):
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.CANCEL_RENAME)
+            base.write_current_category(call.from_user.id, category='')
 
 
 @bot.message_handler(
     content_types=['text'],
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.NEW_CATEGORY_NAME.value
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.NEW_CAT_NAME.value
 )
 def rename_category(message: Message):
     base = SqW(config.DB_FILE)
     data['category'] = base.get_user_state(message.chat.id)['current_category']
     response = core.rename_category(message, data)
-    delete_posts(message=message, ids=base.get_user_state(message.chat.id)['carousel_id'].split(','))
-    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-    base.write_current_category(message.chat.id, category='')
-    base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
+    with MsqUpdate(response, message, delete=True, state=States.DEFAULT.value):
+        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
+        base.write_current_category(message.chat.id, category='')
 
 
 @bot.message_handler(
@@ -232,12 +258,9 @@ def rename_category(message: Message):
 )
 def assemble_post(message: Message):
     """ Сборка ранее отправленного поста (по команде) """
-    base = SqW(config.DB_FILE)
     response = core.assemble_post_handler(message, data)
-    base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
-    send_post(message, response)
-    carousel_ids = core.define_carousel_ids(message, response)
-    base.write_carousel_id(message.chat.id, carousel_ids)
+    with MsqUpdate(response, message, mem=True, state=States.ASSEMBLE.value):
+        send_post(message, response)
 
 
 @bot.callback_query_handler(
@@ -247,31 +270,30 @@ def setup_post(call: CallbackQuery):
     """ Обработка коллбэк-кнопок в режиме сборки поста """
     base = SqW(config.DB_FILE)
     if call.data == 'category':
-        base.set_state(user_id=call.from_user.id, state=States.CATEGORY.value)
         response = core.choose_category(message=call.message, data=data)
-        control_msg_id = base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
-        bot.edit_message_text(text=response.text, chat_id=call.message.chat.id, message_id=control_msg_id)
-        bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=control_msg_id,
-                                      reply_markup=response.keyboard)
+        with MsqUpdate(response, call.message, state=States.CATEGORY.value):
+            control_msg_id = base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+            bot.edit_message_text(text=response.text, chat_id=call.message.chat.id, message_id=control_msg_id)
+            bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=control_msg_id,
+                                          reply_markup=response.keyboard)
     elif call.data == 'comment':
-        base.set_state(user_id=call.from_user.id, state=States.COMMENT.value)
         response = core.await_comment(call.message, data)
-        control_msg_id = base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
-        bot.edit_message_text(text=response.text, chat_id=call.message.chat.id, message_id=control_msg_id)
-        bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=control_msg_id,
-                                      reply_markup=response.keyboard)
-        bot.answer_callback_query(callback_query_id=call.id, text=response.text)
+        with MsqUpdate(response, call.message, state=States.COMMENT.value):
+            control_msg_id = base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+            bot.edit_message_text(text=response.text, chat_id=call.message.chat.id, message_id=control_msg_id)
+            if response.keyboard.keyboard:
+                bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=control_msg_id,
+                                              reply_markup=response.keyboard)
+            bot.answer_callback_query(callback_query_id=call.id, text=response.text)
     elif call.data == 'cancel':
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         response = core.cancel_assemble(call.message)
-        bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-        delete_posts(message=call.message, ids=base.get_user_state(call.message.chat.id)['carousel_id'].split(','))
+        with MsqUpdate(response, call.message, delete=True, state=States.DEFAULT.value):
+            bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
     elif call.data == 'confirm':
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
         response = core.confirm_post(message=call.message, data=data)
-        delete_posts(message=call.message, ids=[base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]])
-        bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
+        with MsqUpdate(response, call.message, delete=True, last=True, state=States.DEFAULT.value):
+            bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.message_handler(
@@ -283,6 +305,7 @@ def accept_comment(message: Message):
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_comment(message, data)
+    # with MsqUpdate(response, message, delete=)    придумать как привести к общему знаменателю и этот случай
     send_post(message, response)
     msg_id_list = base.get_user_state(message.chat.id)['carousel_id'].split(',')
     msg_id_list.append(str(int(msg_id_list[-1]) + 1))
@@ -294,17 +317,15 @@ def accept_comment(message: Message):
 @bot.callback_query_handler(
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.COMMENT.value
 )
-def cancel_comment(call):
+def cancel_comment(call: CallbackQuery):
     """ Удаление ранее добавленного комментария """
-    base = SqW(config.DB_FILE)
     if call.data == 'del_comment':
         bot.answer_callback_query(callback_query_id=call.id, text=Rp.COMMENT_REMOVED)
         response = core.remove_comment(call.message, data)
-        base.set_state(user_id=call.from_user.id, state=States.ASSEMBLE.value)
-        send_post(call.message, response)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        carousel_ids = core.define_carousel_ids(call.message, response)
-        base.write_carousel_id(call.from_user.id, carousel_ids)
+        with MsqUpdate(response, call.message, delete=True, mem=True, state=States.ASSEMBLE.value):
+            send_post(call.message, response)
+    elif call.data == 'cancel':
+        pass
 
 
 @bot.callback_query_handler(
@@ -312,30 +333,25 @@ def cancel_comment(call):
 )
 def accept_category(call: CallbackQuery):
     """ Присвоение собираемому посту выбранной категории """
-    base = SqW(config.DB_FILE)
-    base.set_state(user_id=call.message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_category(call, data)
-    bot.answer_callback_query(callback_query_id=call.id, text=f'{Rp.POST_ASSIGNED}{call.data}')
-    send_post(call.message, response)
-    delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-    carousel_ids = core.define_carousel_ids(call.message, response)
-    base.write_carousel_id(call.from_user.id, carousel_ids)
+    with MsqUpdate(response, call.message, delete=True, mem=True, state=States.ASSEMBLE.value):
+        bot.answer_callback_query(callback_query_id=call.id, text=f'{Rp.POST_ASSIGNED}{call.data}')
+        send_post(call.message, response)
 
 
 @bot.message_handler(
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value and
-    message.text == 'Мои записи'
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value
+    and message.text == 'Мои записи'
 )
 def look_categories(message: Message):
     """ Просмотр добавленных категорий """
-    base = SqW(config.DB_FILE)
-    base.set_state(user_id=message.chat.id, state=States.LOOK.value)
     data['mode'] = 'look'
     response = core.look_handler(message, data)
-    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-    base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
+    with MsqUpdate(response, message, mem=True, next_one=True, state=States.LOOK.value):
+        bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
+# тоже больше не нужна.
 @bot.message_handler(
     commands=['look'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
@@ -361,48 +377,46 @@ def look_records(call: CallbackQuery):
     """ Просмотр постов выбранной категории """
     base = SqW(config.DB_FILE)
     if call.data == 'add_category':
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        base.set_state(user_id=call.message.chat.id, state=States.CATEGORY_NAME.value)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.CATEGORY_NAME)
+        with MsqUpdate(message=call.message, delete=True, state=States.CATEGORY_NAME.value):
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.CATEGORY_NAME)
     elif call.data == 'prev' or call.data == 'next':
         response = core.carousel_handler(call, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        send_post(call.message, response, carousel=True)
-        carousel_ids = core.define_carousel_ids(call.message, response)
-        base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
+        with MsqUpdate(response, call.message, delete=True, mem=True):
+            send_post(call.message, response, carousel=True)
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
     elif call.data == 'pass':  # Нажата пустая кнопка
         pass
     elif call.data == 'cancel':
-        bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
         response = core.start_handler(message=call.message)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.MAIN_MENU_RET,
-                         reply_markup=response.keyboard)
-        base.set_state(user_id=call.from_user.id, state=States.DEFAULT.value)
+        with MsqUpdate(response, call.message, delete=True, state=States.DEFAULT.value):
+            bot.answer_callback_query(callback_query_id=call.id, text=Rp.CANCEL)
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.MAIN_MENU_RET,
+                             reply_markup=response.keyboard)
     elif call.data == 'remove':
-        base.set_state(user_id=call.from_user.id, state=States.DELETE_POST.value)
         response = core.delete_post_warn(call.message, data)
-        bot.edit_message_text(text=response.text, chat_id=call.message.chat.id,
-                              message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
-        bot.edit_message_reply_markup(reply_markup=response.keyboard, chat_id=call.message.chat.id,
-                                      message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+        with MsqUpdate(response, call.message, state=States.DELETE_POST.value):
+            bot.edit_message_text(text=response.text, chat_id=call.message.chat.id,
+                                  message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+            bot.edit_message_reply_markup(
+                reply_markup=response.keyboard, chat_id=call.message.chat.id,
+                message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+            )
     elif call.data == 'replace':
-        base.set_state(user_id=call.from_user.id, state=States.REPLACE_POST.value)
         data['mode'] = 'replace'
         response = core.look_handler(call.message, data)
-        bot.edit_message_text(text=response.text, chat_id=call.message.chat.id,
-                              message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
-        bot.edit_message_reply_markup(reply_markup=response.keyboard, chat_id=call.message.chat.id,
-                                      message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+        with MsqUpdate(response, call.message, state=States.REPLACE_POST.value):
+            bot.edit_message_text(text=response.text, chat_id=call.message.chat.id,
+                                  message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+            bot.edit_message_reply_markup(
+                reply_markup=response.keyboard, chat_id=call.message.chat.id,
+                message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+            )
     else:
         data['category'] = call.data
         response = core.look_records_handler(message=call.message, data=data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        send_post(call.message, response, carousel=True)
-        carousel_ids = core.define_carousel_ids(call.message, response)
-        base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
+        with MsqUpdate(response, call.message, delete=True, mem=True):
+            send_post(call.message, response, carousel=True)
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_CONTROL, reply_markup=response.keyboard)
 
 
 @bot.callback_query_handler(
@@ -413,19 +427,19 @@ def delete_post_from_category(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'confirm':
         response = core.delete_post(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.answer_callback_query(callback_query_id=call.id, text=Rp.POST_REMOVED)
-        send_post(call.message, response, carousel=True)
-        carousel_ids = core.define_carousel_ids(call.message, response)
-        base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_REMOVED, reply_markup=response.keyboard)
+        with MsqUpdate(response, call.message, delete=True, mem=True, state=States.LOOK.value):
+            bot.answer_callback_query(callback_query_id=call.id, text=Rp.POST_REMOVED)
+            send_post(call.message, response, carousel=True)
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_REMOVED, reply_markup=response.keyboard)
     elif call.data == 'cancel':
         response = core.change_post_cancel(call.message, data)
-        bot.edit_message_text(text=Rp.POST_CONTROL, chat_id=call.message.chat.id,
-                              message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
-        bot.edit_message_reply_markup(reply_markup=response.keyboard, chat_id=call.message.chat.id,
-                                      message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
-    base.set_state(user_id=call.from_user.id, state=States.LOOK.value)
+        with MsqUpdate(response, call.message, state=States.LOOK.value):
+            bot.edit_message_text(text=Rp.POST_CONTROL, chat_id=call.message.chat.id,
+                                  message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+            bot.edit_message_reply_markup(
+                reply_markup=response.keyboard, chat_id=call.message.chat.id,
+                message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+            )
 
 
 @bot.callback_query_handler(
@@ -436,20 +450,20 @@ def replace_post(call: CallbackQuery):
     base = SqW(config.DB_FILE)
     if call.data == 'cancel':
         response = core.change_post_cancel(call.message, data)
-        bot.edit_message_text(text=Rp.POST_CONTROL, chat_id=call.message.chat.id,
-                              message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
-        bot.edit_message_reply_markup(reply_markup=response.keyboard, chat_id=call.message.chat.id,
-                                      message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+        with MsqUpdate(response, call.message, state=States.LOOK.value):
+            bot.edit_message_text(text=Rp.POST_CONTROL, chat_id=call.message.chat.id,
+                                  message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1])
+            bot.edit_message_reply_markup(
+                reply_markup=response.keyboard, chat_id=call.message.chat.id,
+                message_id=base.get_user_state(call.from_user.id)['carousel_id'].split(',')[-1]
+            )
     else:
         data['category'] = call.data
         response = core.replace_post(call.message, data)
-        delete_posts(message=call.message, ids=base.get_user_state(call.from_user.id)['carousel_id'].split(','))
-        bot.answer_callback_query(callback_query_id=call.id, text=Rp.POST_REPLACED)
-        send_post(call.message, response, carousel=True)
-        carousel_ids = core.define_carousel_ids(call.message, response)
-        base.write_carousel_id(call.from_user.id, carousel_ids)
-        bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_REPLACED, reply_markup=response.keyboard)
-    base.set_state(user_id=call.from_user.id, state=States.LOOK.value)
+        with MsqUpdate(response, call.message, delete=True, mem=True, state=States.LOOK.value):
+            bot.answer_callback_query(callback_query_id=call.id, text=Rp.POST_REPLACED)
+            send_post(call.message, response, carousel=True)
+            bot.send_message(chat_id=call.message.chat.id, text=Rp.POST_REPLACED, reply_markup=response.keyboard)
 
 
 @bot.message_handler(
@@ -465,10 +479,8 @@ def new_record(message: Message):
 @bot.message_handler(content_types=['text', 'document', 'photo', 'video'])
 def any_msg(message: Message):
     """ Обработка всего, что не было обработано другими хэндлерами, как неизвестной команды """
-    base = SqW(config.DB_FILE)
-    delete_posts(message=message, ids=base.get_user_state(message.chat.id)['carousel_id'].split(','))
-    bot.send_message(chat_id=message.chat.id, text=Rp.UNKNOWN)
-    base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
+    with MsqUpdate(message=message, delete=True, state=States.DEFAULT.value):
+        bot.send_message(chat_id=message.chat.id, text=Rp.UNKNOWN)
 
 
 @time_it

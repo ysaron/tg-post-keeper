@@ -309,7 +309,7 @@ class Response:
     def mkkb_confirm(data: dict) -> types.InlineKeyboardMarkup:
         markup = types.InlineKeyboardMarkup()
         btn2 = types.InlineKeyboardButton(text='Отмена', callback_data='cancel')
-        if data['state'] in [States.DELETE.value, States.DELETE_POST.value]:
+        if data['state'] in [States.LOOK.value, States.DELETE.value]:
             btn1 = types.InlineKeyboardButton(text='Подтвердить', callback_data='confirm')
             markup.row(btn1, btn2)
         elif data['state'] in [States.RENAME.value, States.REPLACE_POST.value]:
