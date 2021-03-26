@@ -90,22 +90,6 @@ def cmd_update(message: Message):
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
-# убрать команду
-@bot.message_handler(
-    commands=['newcategory'],
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
-                                                                                          States.LOOK.value]
-)
-def new_category(message: Message):
-    """ Добавление категории по команде """
-    base = SqW(config.DB_FILE)
-    if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
-        delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
-        base.write_carousel_id(message.chat.id, [0])
-    base.set_state(user_id=message.chat.id, state=States.CATEGORY_NAME.value)
-    bot.send_message(chat_id=message.chat.id, text=Rp.CATEGORY_NAME)
-
-
 @bot.message_handler(
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value
     and message.text == 'Настройки'
@@ -154,24 +138,6 @@ def add_category(message: Message):
     bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
-# убрать команду, она больше не нужна
-@bot.message_handler(
-    commands=['delete'],
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
-                                                                                          States.LOOK.value]
-)
-def choose_category_delete(message: Message):
-    base = SqW(config.DB_FILE)
-    if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
-        delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
-        base.write_carousel_id(message.chat.id, [0])
-    base.set_state(user_id=message.chat.id, state=States.DELETE.value)
-    data['mode'] = 'delete'
-    response = core.look_handler(message, data)
-    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-    base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
-
-
 @bot.callback_query_handler(
     func=lambda call: SqW(config.DB_FILE).get_user_state(call.from_user.id)['state'] == States.DELETE.value
 )
@@ -192,24 +158,6 @@ def delete_category(call: CallbackQuery):
         response = core.delete_category_warn(call.message, data)
         with MsqUpdate(response, call.message, delete=True, mem=True, next_one=True):
             bot.send_message(chat_id=call.message.chat.id, text=response.text, reply_markup=response.keyboard)
-
-
-# ubrat comandu
-@bot.message_handler(
-    commands=['rename'],
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
-                                                                                          States.LOOK.value]
-)
-def choose_category_rename(message: Message):
-    base = SqW(config.DB_FILE)
-    if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
-        delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
-        base.write_carousel_id(message.chat.id, [0])
-    base.set_state(user_id=message.chat.id, state=States.RENAME.value)
-    data['mode'] = 'rename'
-    response = core.look_handler(message, data)
-    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-    base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
 
 
 @bot.callback_query_handler(
@@ -349,25 +297,6 @@ def look_categories(message: Message):
     response = core.look_handler(message, data)
     with MsqUpdate(response, message, mem=True, next_one=True, state=States.LOOK.value):
         bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-
-
-# тоже больше не нужна.
-@bot.message_handler(
-    commands=['look'],
-    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] in [States.DEFAULT.value,
-                                                                                          States.LOOK.value]
-)
-def look_categories_oldvers(message: Message):
-    """ Просмотр добавленных категорий по команде """
-    base = SqW(config.DB_FILE)
-    if base.get_user_state(message.chat.id)['state'] == States.LOOK.value:
-        delete_posts(message=message, ids=[base.get_user_state(message.chat.id)['carousel_id'].split(',')[-1]])
-        base.write_carousel_id(message.chat.id, [0])
-    base.set_state(user_id=message.chat.id, state=States.LOOK.value)
-    data['mode'] = 'look'
-    response = core.look_handler(message, data)
-    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
-    base.write_carousel_id(user_id=message.chat.id, carousel_ids=[message.message_id + 1])
 
 
 @bot.callback_query_handler(
