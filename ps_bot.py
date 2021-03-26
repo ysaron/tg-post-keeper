@@ -201,14 +201,26 @@ def rename_category(message: Message):
 
 
 @bot.message_handler(
-    commands=['assemble'],
     func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value
+    and message.text == 'Сохранить'
 )
 def assemble_post(message: Message):
-    """ Сборка ранее отправленного поста (по команде) """
+    """ Сборка ранее отправленного поста """
     response = core.assemble_post_handler(message, data)
     with MsqUpdate(response, message, mem=True, state=States.ASSEMBLE.value):
         send_post(message, response)
+
+
+@bot.message_handler(
+    func=lambda message: SqW(config.DB_FILE).get_user_state(message.chat.id)['state'] == States.DEFAULT.value
+    and message.text == 'Отмена'
+)
+def cancel_post(message: Message):
+    """ Отмена сохранения поста """
+    base = SqW(config.DB_FILE)
+    base.set_state(user_id=message.chat.id, state=States.DEFAULT.value)
+    response = core.start_handler(message=message)
+    bot.send_message(chat_id=message.chat.id, text=response.text, reply_markup=response.keyboard)
 
 
 @bot.callback_query_handler(

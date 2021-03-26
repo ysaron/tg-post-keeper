@@ -190,7 +190,7 @@ class Response:
     @staticmethod
     def mkkb_new_record() -> types.ReplyKeyboardMarkup:
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        buttons = ['/assemble', '/cancel']
+        buttons = ['Сохранить', 'Отмена']
         kb.row(*buttons)
         return kb
 
