@@ -1,5 +1,5 @@
 from telebot import types
-from config import DEFAULT_CATEGORIES, States, Replies as Rp
+from config import DEFAULT_CATEGORIES, States, Replies as Rp, ResponseTypes as Rt
 
 
 class User:
@@ -76,39 +76,39 @@ class Post:
 
 class Response:
 
-    def __init__(self, resp_type: str, data: dict = None):
+    def __init__(self, resp_type: int, data: dict = None):
         self.text = None
         self.attachment = None
         self.keyboard = types.ReplyKeyboardRemove()
         self.flag = None
 
-        if resp_type == 'start':
+        if resp_type == Rt.START.value:
             self.text = Rp.START
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'updated':
+        elif resp_type == Rt.UPDATED.value:
             self.text = Rp.HELP_UPDATED
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'added_category':
+        elif resp_type == Rt.CATEGORY_ADDED.value:
             self.text = self.mktext_added_category(data)
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'part_record':
+        elif resp_type == Rt.PART_OF_RECORD.value:
             self.text = Rp.PART_RECEIVED_YES if data['success'] else Rp.PART_RECEIVED_NO
             self.keyboard = self.mkkb_new_record()
-        elif resp_type == 'no_temp':
+        elif resp_type == Rt.NO_TEMP.value:
             self.text = Rp.NO_TEMP
             self.flag = 'no_records'
             self.keyboard = self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'caption_too_long':
+        elif resp_type == Rt.CAPTION_TOO_LONG.value:
             self.text = Rp.CAPTION_TOO_LONG
-        elif resp_type == 'assembled_post':
+        elif resp_type == Rt.POST_ASSEMBLED.value:
             self.text = self.mktext_assembled_post(data['post'])
             self.attachment = data['post'].attachment
             self.keyboard = self.mkkb_assemble_post(data)
             self.flag = data['post'].attach_type
-        elif resp_type == 'await_comment':
+        elif resp_type == Rt.AWAIT_COMMENT.value:
             self.text = self.mktext_await_comment(data)
             self.keyboard = self.mkkb_await_comment(data)
-        elif resp_type == 'handled_comment':
+        elif resp_type == Rt.COMMENT_HANDLED.value:
             if data['success']:
                 self.text = self.mktext_assembled_post(data['post'])
                 self.flag = data['post'].attach_type
@@ -117,10 +117,10 @@ class Response:
             else:
                 self.text = Rp.COMMENT_RETRY
                 self.flag = 'error1'
-        elif resp_type == 'choose_category':
+        elif resp_type == Rt.CHOOSE_CATEGORY.value:
             self.text = Rp.CHOOSE_CATEGORY
             self.keyboard = self.mkkb_choose_category(data)
-        elif resp_type == 'handled_category':
+        elif resp_type == Rt.CATEGORY_HANDLED.value:
             if data['success']:
                 self.text = self.mktext_assembled_post(data['post'])
                 self.flag = data['post'].attach_type
@@ -129,47 +129,47 @@ class Response:
             else:
                 self.text = Rp.HANDLE_CATEGORY_ERROR
                 self.flag = 'error2'
-        elif resp_type == 'cancel_assembling':
+        elif resp_type == Rt.CANCEL_ASSEMBLING.value:
             self.text = Rp.CANCEL_ASSEMBLING
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'confirm_post':
+        elif resp_type == Rt.CONFIRM_POST.value:
             self.text = Rp.CONFIRM_POST_.format(data['category'])
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'look_categories':
+        elif resp_type == Rt.LOOK_CATEGORIES.value:
             self.text = self.mktext_categories_action(data)
             self.keyboard = self.mkkb_look_categories(data)
-        elif resp_type == 'carousel':
+        elif resp_type == Rt.CAROUSEL.value:
             self.text = self.mktext_assembled_post(data['post'])
             self.flag = data['post'].attach_type
             self.attachment = data['post'].attachment
             self.keyboard = self.mkkb_carousel(data)
-        elif resp_type == 'no_posts':
+        elif resp_type == Rt.NO_POSTS.value:
             self.text = self.mktext_no_posts(data)
             self.keyboard = self.mkkb_no_posts(data)
             self.attachment = None      # Скидывать пикчу перекати поле скажем
             self.flag = 'text'
-        elif resp_type == 'delete_warning':
+        elif resp_type == Rt.DELETE_WARNING.value:
             self.text = Rp.DELETE_WARNING_.format(data['category'], data['length'])
             self.keyboard = self.mkkb_confirm(data)
-        elif resp_type == 'deleted_category':
+        elif resp_type == Rt.CATEGORY_DELETED.value:
             if data['success']:
                 self.text = Rp.DELETED_CATEGORY_.format(data['category'])
             else:
                 self.text = Rp.DEL_CATEGORY_FAIL
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'new_category_name':
+        elif resp_type == Rt.NEW_CATEGORY_NAME.value:
             self.text = Rp.NEW_CATEGORY_NAME_.format(data['category'])
             self.keyboard = self.mkkb_confirm(data)
-        elif resp_type == 'renamed_category':
+        elif resp_type == Rt.CATEGORY_RENAMED.value:
             if data['success']:
                 self.text = Rp.RENAMED_CATEGORY_.format(data['category'])
             else:
                 self.text = Rp.REN_CATEGORY_FAIL
             self.keyboard = self.mkkb_main_kb()
-        elif resp_type == 'delete_post_warning':
+        elif resp_type == Rt.DELETE_POST_WARNING.value:
             self.text = Rp.DEL_POST_WARNING
             self.keyboard = self.mkkb_confirm(data)
-        elif resp_type == 'settings':
+        elif resp_type == Rt.SETTINGS.value:
             self.text = Rp.SETTINGS
             self.keyboard = self.mkkb_settings()
 

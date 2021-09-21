@@ -4,6 +4,7 @@ from telebot.types import Message, CallbackQuery
 from frame import User, Response, Post
 from sqler import SqlWorker
 import config
+from config import ResponseTypes as Rt
 
 
 def start_handler(message: Message) -> Response:
@@ -26,7 +27,7 @@ def start_handler(message: Message) -> Response:
         # Автоматически заполняем категорию help-постами
         help_fill(user.user_id)
     base.clear_temp(user.user_id)
-    return Response(resp_type='start')
+    return Response(resp_type=Rt.START.value)
 
 
 def help_handler(message: Message, data: dict) -> Response:
@@ -35,7 +36,7 @@ def help_handler(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     records = base.get_all_by_category(user_id=user.user_id, category='HELP')
     if not records:
-        return Response(resp_type='no_posts')
+        return Response(resp_type=Rt.NO_POSTS.value)
     records_ids = [record['id'] for record in records]
     base.write_records_id(user_id=user.user_id, id_list=records_ids)
     base.write_current_record(user_id=user.user_id, post_id=records_ids[0])
@@ -43,7 +44,7 @@ def help_handler(message: Message, data: dict) -> Response:
     post = Post(post_db)
     data['post'] = post
     data['position'] = f'Стр. {records_ids.index(records_ids[0]) + 1} из {len(records_ids)}'
-    return Response(resp_type='carousel', data=data)
+    return Response(resp_type=Rt.CAROUSEL.value, data=data)
 
 
 def update(message: Message, data: dict):
@@ -54,7 +55,7 @@ def update(message: Message, data: dict):
     for user_id in users_ids:
         base.delete_all_by_category(user_id, category='HELP')
         help_fill(user_id)
-    return Response(resp_type='updated', data=data)
+    return Response(resp_type=Rt.UPDATED.value, data=data)
 
 
 def add_category_handler(message: Message, data: dict) -> Response:
@@ -71,7 +72,7 @@ def add_category_handler(message: Message, data: dict) -> Response:
         added = base.add_user_categories(user)
     data['success'] = added
     data['category'] = message.text
-    return Response(resp_type='added_category', data=data)
+    return Response(resp_type=Rt.CATEGORY_ADDED.value, data=data)
 
 
 def record_handler(message: Message, data: dict) -> Response:
@@ -84,7 +85,7 @@ def record_handler(message: Message, data: dict) -> Response:
     # Telegram разрешает caption не более 1024 символов
     if message.html_caption is not None and len(message.html_caption) > 880:
         base.set_state(user.user_id, config.States.DEFAULT.value)
-        return Response(resp_type='caption_too_long', data=data)
+        return Response(resp_type=Rt.CAPTION_TOO_LONG.value, data=data)
 
     # Поддерживаемые типы файлов:
     # Видео
@@ -137,7 +138,7 @@ def record_handler(message: Message, data: dict) -> Response:
         data['success'] = True
     else:  # уже слишком много частей
         data['success'] = False
-    return Response(resp_type='part_record', data=data)
+    return Response(resp_type=Rt.PART_OF_RECORD.value, data=data)
 
 
 def assemble_post_handler(message: Message, data: dict) -> Response:
@@ -146,7 +147,7 @@ def assemble_post_handler(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     parts = base.get_all_temp(user.user_id)
     if not parts:
-        return Response(resp_type='no_temp')
+        return Response(resp_type=Rt.NO_TEMP.value)
     elif len(parts) == 1:  # Запись из 1 части
         if parts[0]['content_type'] == 'text':  # текст без вложений
             message_text = parts[0]['message_text']
@@ -194,7 +195,7 @@ def assemble_post_handler(message: Message, data: dict) -> Response:
     data['user'] = user
     base.write_current_record(user_id=user_id, post_id=data['post'].post_id)
     base.write_carousel_id(user_id=user_id, carousel_ids=[message.message_id + 1])
-    return Response(resp_type='assembled_post', data=data)
+    return Response(resp_type=Rt.POST_ASSEMBLED.value, data=data)
 
 
 def epoch_to_strftime(epoch: int) -> str:
@@ -212,7 +213,7 @@ def cancel_assemble(message: Message):
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
     base.delete_post(user_id=user.user_id, post_id=post_id)
-    return Response(resp_type='cancel_assembling')
+    return Response(resp_type=Rt.CANCEL_ASSEMBLING.value)
 
 
 def await_comment(message: Message, data: dict) -> Response:
@@ -220,7 +221,7 @@ def await_comment(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     post = Post(base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record']))
     data['post'] = post
-    return Response(resp_type='await_comment', data=data)
+    return Response(resp_type=Rt.AWAIT_COMMENT.value, data=data)
 
 
 def handle_comment(message: Message, data: dict) -> Response:
@@ -233,12 +234,12 @@ def handle_comment(message: Message, data: dict) -> Response:
     if len(message.text) > symbols - len(post.text):
         data['post'] = post
         data['success'] = False
-        return Response(resp_type='handled_comment', data=data)
+        return Response(resp_type=Rt.COMMENT_HANDLED.value, data=data)
     added = base.edit_comment(user_id=user.user_id, post_id=post.post_id, comment=message.text)
     data['post'] = Post(base.get_post(user_id=user.user_id,
                                       post_id=base.get_user_state(user.user_id)['current_record']))
     data['success'] = added
-    return Response(resp_type='handled_comment', data=data)
+    return Response(resp_type=Rt.COMMENT_HANDLED.value, data=data)
 
 
 def remove_comment(message: Message, data: dict):
@@ -250,14 +251,14 @@ def remove_comment(message: Message, data: dict):
     data['post'] = Post(base.get_post(user_id=user.user_id,
                                       post_id=base.get_user_state(user.user_id)['current_record']))
     data['success'] = removed
-    return Response(resp_type='handled_comment', data=data)
+    return Response(resp_type=Rt.COMMENT_HANDLED.value, data=data)
 
 
 def choose_category(message: Message, data: dict) -> Response:
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     data['category']: list = base.get_user_categories(user.user_id).split(',')
-    return Response(resp_type='choose_category', data=data)
+    return Response(resp_type=Rt.CHOOSE_CATEGORY.value, data=data)
 
 
 def handle_category(call: CallbackQuery, data: dict) -> Response:
@@ -271,7 +272,7 @@ def handle_category(call: CallbackQuery, data: dict) -> Response:
         data['success'] = False
     data['post'] = Post(base.get_post(user_id=user.user_id,
                                       post_id=base.get_user_state(user.user_id)['current_record']))
-    return Response(resp_type='handled_category', data=data)
+    return Response(resp_type=Rt.CATEGORY_HANDLED.value, data=data)
 
 
 def confirm_post(message: Message, data: dict) -> Response:
@@ -280,7 +281,7 @@ def confirm_post(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     post_db = Post(base.get_post(user_id=user.user_id, post_id=base.get_user_state(user.user_id)['current_record']))
     data['category'] = post_db.category
-    return Response(resp_type='confirm_post', data=data)
+    return Response(resp_type=Rt.CONFIRM_POST.value, data=data)
 
 
 def look_handler(message: Message, data: dict) -> Response:
@@ -289,7 +290,7 @@ def look_handler(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     categories: list = base.get_user_categories(user.user_id).split(',')
     data['category'] = [(cat, len(base.get_all_by_category(user.user_id, cat))) for cat in categories]
-    return Response(resp_type='look_categories', data=data)
+    return Response(resp_type=Rt.LOOK_CATEGORIES.value, data=data)
 
 
 def look_records_handler(message: Message, data: dict) -> Response:
@@ -298,7 +299,7 @@ def look_records_handler(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     records = base.get_all_by_category(user_id=user.user_id, category=data['category'])
     if not records:
-        return Response(resp_type='no_posts', data=data)
+        return Response(resp_type=Rt.NO_POSTS.value, data=data)
     records_ids = [record['id'] for record in records]
     base.write_records_id(user_id=user.user_id, id_list=records_ids)
     base.write_current_record(user_id=user.user_id, post_id=records_ids[0])
@@ -306,7 +307,7 @@ def look_records_handler(message: Message, data: dict) -> Response:
     post = Post(post_db)
     data['post'] = post
     data['position'] = f'Стр. {records_ids.index(records_ids[0]) + 1} из {len(records_ids)}'
-    return Response(resp_type='carousel', data=data)
+    return Response(resp_type=Rt.CAROUSEL.value, data=data)
 
 
 def delete_category_warn(message: Message, data: dict) -> Response:
@@ -316,7 +317,7 @@ def delete_category_warn(message: Message, data: dict) -> Response:
     base.write_current_category(user.user_id, data['category'])
     records = base.get_all_by_category(user_id=user.user_id, category=data['category'])
     data['length'] = len(records)
-    return Response(resp_type='delete_warning', data=data)
+    return Response(resp_type=Rt.DELETE_WARNING.value, data=data)
 
 
 def delete_category(message: Message, data: dict) -> Response:
@@ -324,14 +325,14 @@ def delete_category(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     if data['category'] == 'HELP':
         data['success'] = False
-        return Response(resp_type='deleted_category', data=data)
+        return Response(resp_type=Rt.CATEGORY_DELETED.value, data=data)
     posts_deleted = base.delete_all_by_category(user_id=user.user_id, category=data['category'])
     categories = base.get_user_categories(user.user_id).split(',')
     categories.remove(data['category'])
     user.categories = ','.join(categories)
     categories_changed = base.add_user_categories(user=user)
     data['success'] = posts_deleted and categories_changed
-    return Response(resp_type='deleted_category', data=data)
+    return Response(resp_type=Rt.CATEGORY_DELETED.value, data=data)
 
 
 def choose_new_category_name(message: Message, data: dict) -> Response:
@@ -339,7 +340,7 @@ def choose_new_category_name(message: Message, data: dict) -> Response:
     base = SqlWorker(config.DB_FILE)
     data['state'] = base.get_user_state(user.user_id)['state']
     base.write_current_category(user.user_id, data['category'])
-    return Response(resp_type='new_category_name', data=data)
+    return Response(resp_type=Rt.NEW_CATEGORY_NAME.value, data=data)
 
 
 def rename_category(message: Message, data: dict) -> Response:
@@ -356,7 +357,7 @@ def rename_category(message: Message, data: dict) -> Response:
         user.categories = ','.join(categories)
         changed2 = base.add_user_categories(user=user)
         data['success'] = changed1 and changed2
-    return Response(resp_type='renamed_category', data=data)
+    return Response(resp_type=Rt.CATEGORY_RENAMED.value, data=data)
 
 
 def carousel_handler(call: CallbackQuery, data: dict) -> Response:
@@ -366,7 +367,7 @@ def carousel_handler(call: CallbackQuery, data: dict) -> Response:
     try:
         records_ids = [int(i) for i in base.get_user_state(user.user_id)['records_id'].split(',')]
     except ValueError:
-        return Response(resp_type='no_posts', data=data)
+        return Response(resp_type=Rt.NO_POSTS.value, data=data)
     current_record = base.get_user_state(user.user_id)['current_record']
     new_record = shift(records_ids, current_record, call.data)
     base.write_current_record(user_id=user.user_id, post_id=new_record)
@@ -374,25 +375,25 @@ def carousel_handler(call: CallbackQuery, data: dict) -> Response:
     post = Post(post_db)
     data['post'] = post
     data['position'] = f'Стр. {records_ids.index(new_record) + 1} из {len(records_ids)}'
-    return Response(resp_type='carousel', data=data)
+    return Response(resp_type=Rt.CAROUSEL.value, data=data)
 
 
 def delete_post_warn(message: Message, data: dict) -> Response:
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     data['state'] = base.get_user_state(user.user_id)['state']
-    return Response(resp_type='delete_post_warning', data=data)
+    return Response(resp_type=Rt.DELETE_POST_WARNING.value, data=data)
 
 
 def change_post_cancel(message: Message, data: dict) -> Response:
-    return Response(resp_type='carousel', data=data)
+    return Response(resp_type=Rt.CAROUSEL.value, data=data)
 
 
 def delete_post(message: Message, data: dict) -> Response:
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
-    deleted: bool = base.delete_post(user_id=user.user_id, post_id=post_id)
+    base.delete_post(user_id=user.user_id, post_id=post_id)
     post_list = [int(i) for i in base.get_user_state(user.user_id)['records_id'].split(',')]
     new_record = shift(post_list, post_id, 'next')
     post_list.remove(post_id)
@@ -400,17 +401,17 @@ def delete_post(message: Message, data: dict) -> Response:
     base.write_current_record(user_id=user.user_id, post_id=new_record)
     post_db = base.get_post(user.user_id, new_record)
     if post_db is None:
-        return Response(resp_type='no_posts', data=data)
+        return Response(resp_type=Rt.NO_POSTS.value, data=data)
     post = Post(post_db)
     data['post'] = post
-    return Response(resp_type='carousel', data=data)
+    return Response(resp_type=Rt.CAROUSEL.value, data=data)
 
 
 def replace_post(message: Message, data: dict) -> Response:
     user = User(message)
     base = SqlWorker(config.DB_FILE)
     post_id = base.get_user_state(user.user_id)['current_record']
-    replaced: bool = base.edit_category(user_id=user.user_id, post_id=post_id, category=data['category'])
+    base.edit_category(user_id=user.user_id, post_id=post_id, category=data['category'])
     post_list = [int(i) for i in base.get_user_state(user.user_id)['records_id'].split(',')]
     new_record = shift(post_list, post_id, 'next')
     post_list.remove(post_id)   # Удаление поста из текущей "карусели"
@@ -418,22 +419,20 @@ def replace_post(message: Message, data: dict) -> Response:
     base.write_current_record(user_id=user.user_id, post_id=new_record)
     post_db = base.get_post(user.user_id, new_record)
     if post_db is None:
-        return Response(resp_type='no_posts', data=data)
+        return Response(resp_type=Rt.NO_POSTS.value, data=data)
     post = Post(post_db)
     data['post'] = post
-    return Response(resp_type='carousel', data=data)
+    return Response(resp_type=Rt.CAROUSEL.value, data=data)
 
 
 def settings_handler(message: Message, data: dict):
     """ Переход в меню Настройки """
-    user = User(message)
-    base = SqlWorker(config.DB_FILE)
-    return Response(resp_type='settings', data=data)
+    return Response(resp_type=Rt.SETTINGS.value, data=data)
 
 
 def settings_cancel(message: Message, data: dict):
     """ Закрытие меню Настройки """
-    return Response(resp_type='start')
+    return Response(resp_type=Rt.START.value)
 
 
 def extract_item(dicts: list[dict], key_: str):

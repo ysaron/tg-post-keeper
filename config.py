@@ -179,6 +179,31 @@ class Replies:
     ADDED_CATEGORY_NO_ = '❌ Категория <code>{}</code> не была добавлена.'
 
 
+class ResponseTypes(Enum):
+    START = 1
+    UPDATED = 2
+    CATEGORY_ADDED = 3
+    PART_OF_RECORD = 4
+    NO_TEMP = 5
+    CAPTION_TOO_LONG = 6
+    POST_ASSEMBLED = 7
+    AWAIT_COMMENT = 8
+    COMMENT_HANDLED = 9
+    CHOOSE_CATEGORY = 10
+    CATEGORY_HANDLED = 11
+    CANCEL_ASSEMBLING = 12
+    CONFIRM_POST = 13
+    LOOK_CATEGORIES = 14
+    CAROUSEL = 15
+    NO_POSTS = 16
+    DELETE_WARNING = 17
+    CATEGORY_DELETED = 18
+    NEW_CATEGORY_NAME = 19
+    CATEGORY_RENAMED = 20
+    DELETE_POST_WARNING = 21
+    SETTINGS = 22
+
+
 def time_it(func):
     """ Логирование времени выполнения любой функции """
 
