@@ -2,11 +2,16 @@ from enum import Enum
 import logging
 from datetime import datetime
 from telebot import logger
+import os
+from dotenv import load_dotenv
 
-TOKEN = 'Paste your token here'
-ADMIN_ID = 0    # Paste your user id here
+load_dotenv('.env')
 
-DB_FILE = 'your_database_name.db'
+TOKEN = os.environ.get('TOKEN')
+ADMIN_ID = int(os.environ.get('ADMIN_ID'))
+# ALLOWED_IDS = list(map(int, os.environ.get('ALLOWED_IDS').split('.')))
+
+DB_FILE = 'postsorter_db.db'
 
 
 class DefaultText:

@@ -282,11 +282,11 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot change [{old_category} -> {new_category}] for user {user_id} => ({e})')
                 return False
 
-    def get_user_state(self, user_id: str) -> dict:
+    def get_user_state(self, user_id: int) -> dict:
         """ Возвращает всю информацию о состоянии диалога с юзером """
         with self.connection:
             try:
-                self.cursor.execute("""SELECT * FROM temp WHERE user_id = ?""", (user_id,))
+                self.cursor.execute("""SELECT * FROM temp WHERE user_id = ?""", (str(user_id),))
                 return self.cursor.fetchone()
             except Exception as e:
                 ps_logger.exception(f'Cannot get state for user {user_id} => ({e})')
@@ -302,10 +302,10 @@ class SqlWorker:
                 ps_logger.exception(f'Failed to write user {user_id} in temp table => ({e})')
                 return False
 
-    def set_state(self, user_id: str, state: str = '1') -> bool:
+    def set_state(self, user_id: int, state: str = '1') -> bool:
         with self.connection:
             try:
-                self.cursor.execute("""UPDATE temp SET state = ? WHERE user_id = ?""", (state, user_id))
+                self.cursor.execute("""UPDATE temp SET state = ? WHERE user_id = ?""", (state, str(user_id)))
                 self.connection.commit()
                 return True
             except Exception as e:
@@ -333,11 +333,12 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot write current record {post_id} for user {user_id} => ({e})')
                 return False
 
-    def write_carousel_id(self, user_id: str, carousel_ids: list[int]) -> bool:
+    def write_carousel_id(self, user_id: int, carousel_ids: list[int]) -> bool:
         carousel_id_str = ','.join([str(i) for i in carousel_ids])
         with self.connection:
             try:
-                self.cursor.execute("""UPDATE temp SET carousel_id = ? WHERE user_id = ?""", (carousel_id_str, user_id))
+                self.cursor.execute("""UPDATE temp SET carousel_id = ? WHERE user_id = ?""",
+                                    (carousel_id_str, str(user_id)))
                 self.connection.commit()
                 return True
             except Exception as e:
@@ -354,11 +355,11 @@ class SqlWorker:
                 ps_logger.exception(f'Cannot write post length for user {user_id} => ({e})')
                 return False
 
-    def write_current_category(self, user_id: str, category: str) -> bool:
+    def write_current_category(self, user_id: int, category: str) -> bool:
         with self.connection:
             try:
                 self.cursor.execute("""UPDATE temp SET current_category = ? WHERE user_id = ?""",
-                                    (category, user_id))
+                                    (category, str(user_id)))
                 self.connection.commit()
                 return True
             except Exception as e:

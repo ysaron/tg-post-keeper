@@ -1,7 +1,7 @@
 logs
-temp_storage
+ps_venv
 .idea
 __pycache__
-config.py
 postsorter_db.db
 PS_plan.txt
+.env

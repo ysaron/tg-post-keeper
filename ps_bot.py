@@ -13,7 +13,7 @@ bot = telebot.TeleBot(token=config.TOKEN, parse_mode='HTML')
 # Словарь для обмена данными между модулями / функциями
 data = {
     'success': None,
-    'category': None,
+    'category': '',
     'state': States.DEFAULT.value,
     'post': None,
     'user': None,
@@ -265,7 +265,6 @@ def accept_comment(message: Message):
     base = SqW(config.DB_FILE)
     base.set_state(user_id=message.chat.id, state=States.ASSEMBLE.value)
     response = core.handle_comment(message, data)
-    # with MsqUpdate(response, message, delete=)    придумать как привести к общему знаменателю и этот случай
     send_post(message, response)
     msg_id_list = base.get_user_state(message.chat.id)['carousel_id'].split(',')
     msg_id_list.append(str(int(msg_id_list[-1]) + 1))
