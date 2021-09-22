@@ -23,9 +23,7 @@ def start_handler(message: Message) -> Response:
         base.add_user_temp(user.user_id)
     if not base.check_table(f'{user.user_id}_storage'):
         base.add_user_storage(user.user_id)
-
-        # Автоматически заполняем категорию help-постами
-        help_fill(user.user_id)
+        help_fill(user.user_id)     # Автоматически заполняем категорию help-постами
     base.clear_temp(user.user_id)
     return Response(resp_type=Rt.START.value)
 
@@ -104,6 +102,7 @@ def record_handler(message: Message, data: dict) -> Response:
     else:
         file_id = None
         file_uniq_id = None
+
     if message.forward_from_chat is not None:
         ff_id = message.forward_from_chat.id
         ff_title = message.forward_from_chat.title

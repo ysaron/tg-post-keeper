@@ -146,7 +146,7 @@ class Response:
         elif resp_type == Rt.NO_POSTS.value:
             self.text = self.mktext_no_posts(data)
             self.keyboard = self.mkkb_no_posts(data)
-            self.attachment = None      # Скидывать пикчу перекати поле скажем
+            self.attachment = None
             self.flag = 'text'
         elif resp_type == Rt.DELETE_WARNING.value:
             self.text = Rp.DELETE_WARNING_.format(data['category'], data['length'])
