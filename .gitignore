@@ -5,3 +5,4 @@ __pycache__
 postsorter_db.db
 PS_plan.txt
 .env
+ps.conf
